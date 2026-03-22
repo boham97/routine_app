@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(cmd.exe /c \"node --version && npm --version\")",
+      "Bash(cmd.exe /c \"where node 2>nul & where npm 2>nul & dir C:\\\\Users\\\\bosung\\\\AppData\\\\Roaming\\\\nvm 2>nul\")",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Program Files\\\\nodejs\"\" 2>nul & dir \"\"C:\\\\Program Files \\(x86\\)\\\\nodejs\"\" 2>nul & dir \"\"%APPDATA%\\\\npm\"\" 2>nul & dir \"\"%LOCALAPPDATA%\\\\Programs\\\\nodejs\"\" 2>nul\")",
+      "Bash(where node:*)",
+      "Bash(where npx:*)",
+      "Bash(cmd /c \"where node & where npx & node -v\")",
+      "Bash(cmd /c \"node -v\")",
+      "Bash(cmd /c \"npx --version\")",
+      "Bash(cmd /c \"mkdir C:\\\\Users\\\\bosung\\\\Desktop\\\\todo-native\")",
+      "Bash(cmd /c \"dir C:\\\\Users\\\\bosung\\\\Desktop\\\\todo\")",
+      "Bash(cmd /c \"dir /a C:\\\\Users\\\\bosung\\\\Desktop\\\\todo\")"
+    ]
+  }
+}

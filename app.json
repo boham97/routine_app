@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Todo",
+    "slug": "todo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.todo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f2f2f7"
+      },
+      "package": "com.yourname.todo"
+    }
+  }
+}
