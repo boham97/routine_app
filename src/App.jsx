@@ -60,6 +60,14 @@ export default function App() {
   const [ttCount, setTtCount] = useState('1')
   const ttInputRef = useRef(null)
 
+  // ── 세트 실제 횟수 입력 ────────────────────────────────────
+  const [pendingSet, setPendingSet] = useState(null)
+  const [pendingReps, setPendingReps] = useState(0)
+  const [wheelOffset, setWheelOffset] = useState(0) // 부드러운 시각적 오프셋(px)
+  const dragStartY = useRef(null)
+  const dragStartVal = useRef(0)
+  const ITEM_H = 52
+
   // ── 통계 ───────────────────────────────────────────────────
   const now = new Date()
   const thisYear = now.getFullYear(); const thisMonth = now.getMonth()
@@ -139,14 +147,34 @@ export default function App() {
   }
   function removeSession(id) { setWorkoutSessions(p => p.filter(s => s.id !== id)) }
   function toggleSet(sessionId, exerciseId, setIdx) {
-    setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
-      ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
-        ...e, completedSets: Array.from({length: e.sets}, (_, i) => {
-          const cur = e.completedSets?.[i] ?? false
-          return i === setIdx ? !cur : cur
+    // 이미 완료된 세트면 취소, 아니면 횟수 입력 모달 열기
+    const session = workoutSessions.find(s => s.id === sessionId)
+    const ex = session?.exercises.find(e => e.id === exerciseId)
+    const cur = ex?.completedSets?.[setIdx] ?? false
+    if (cur !== false) {
+      // 완료 → 취소
+      setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
+        ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
+          ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
+            i === setIdx ? false : (e.completedSets?.[i] ?? false)
+          )
         })
+      }))
+    } else {
+      setPendingSet({ sessionId, exerciseId, setIdx, plannedReps: ex?.reps ?? 0, unit: ex?.unit ?? '회' })
+      setPendingReps(ex?.reps ?? 0)
+    }
+  }
+  function confirmSet() {
+    const reps = pendingReps > 0 ? pendingReps : pendingSet.plannedReps
+    setWorkoutSessions(p => p.map(s => s.id !== pendingSet.sessionId ? s : {
+      ...s, exercises: s.exercises.map(e => e.id !== pendingSet.exerciseId ? e : {
+        ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
+          i === pendingSet.setIdx ? reps : (e.completedSets?.[i] ?? false)
+        )
       })
     }))
+    setPendingSet(null)
   }
 
   const sessionsForDay     = workoutSessions.filter(s => s.date === selKey)
@@ -219,6 +247,11 @@ export default function App() {
     setTodoGroups(p => p.filter(g => g.templateId !== id))
   }
 
+  // ── 확인 모달 ──────────────────────────────────────────────
+  const [modal, setModal] = useState({ show: false, message: '', onConfirm: null })
+  function confirm(message, onConfirm) { setModal({ show: true, message, onConfirm }) }
+  function closeModal() { setModal({ show: false, message: '', onConfirm: null }) }
+
   // ── 통계 helpers ───────────────────────────────────────────
   const isCurrentMonth = viewYear === thisYear && viewMonth === thisMonth
   function prevMonth() { viewMonth===0?(setViewMonth(11),setViewYear(y=>y-1)):setViewMonth(m=>m-1) }
@@ -251,28 +284,27 @@ export default function App() {
         <span>9:41</span><span>●●●</span>
       </div>
 
-      {/* Header */}
-      <div style={{ padding:'8px 20px 12px', flexShrink:0 }}>
-        <h1 style={{ fontSize:'34px', fontWeight:'700', color:'#000', margin:0 }}>{tabTitle}</h1>
-      </div>
 
       {/* Content */}
-      <div style={{ flex:1, minHeight:0, position:'relative' }}>
+      <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
 
         {/* ════ 할일 탭 ════ */}
-        {tab==='todo' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
-          {/* 날짜 네비게이터 */}
-          <NavCard>
-            <NavBtn onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</NavBtn>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:'17px', fontWeight:'700' }}>
-                {selectedDate.getFullYear()}년 {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}일
-                <span style={{ fontSize:'14px', fontWeight:'500', color:'#8e8e93', marginLeft:'4px' }}>({DAYS[selectedDate.getDay()]})</span>
+        {tab==='todo' && <>
+          {/* 날짜 네비게이터 - 고정 */}
+          <div style={{ padding:'8px 16px', flexShrink:0 }}>
+            <NavCard>
+              <NavBtn onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</NavBtn>
+              <div style={{ textAlign:'center' }}>
+                <div style={{ fontSize:'17px', fontWeight:'700' }}>
+                  {selectedDate.getFullYear()}년 {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}일
+                  <span style={{ fontSize:'14px', fontWeight:'500', color:'#8e8e93', marginLeft:'4px' }}>({DAYS[selectedDate.getDay()]})</span>
+                </div>
+                {labelForDate(selectedDate) && <div style={{ fontSize:'11px', color:'#007aff', marginTop:'2px' }}>{labelForDate(selectedDate)}</div>}
               </div>
-              {labelForDate(selectedDate) && <div style={{ fontSize:'11px', color:'#007aff', marginTop:'2px' }}>{labelForDate(selectedDate)}</div>}
-            </div>
-            <NavBtn onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</NavBtn>
-          </NavCard>
+              <NavBtn onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</NavBtn>
+            </NavCard>
+          </div>
+          <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 8px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
 
           {/* 운동 세션 */}
           {sessionsForDay.map(session => {
@@ -292,7 +324,7 @@ export default function App() {
                     <span style={{ fontSize:'13px', fontWeight:'600', color: doneSets===totalSets&&totalSets>0?'#34c759':'#8e8e93' }}>{rate(doneSets,totalSets)}%</span>
                     <span style={{ color:'#8e8e93', fontSize:'14px', marginLeft:'4px' }}>{expanded?'▲':'▼'}</span>
                   </div>
-                  <button onClick={()=>removeSession(session.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer', paddingLeft:'12px' }}>제거</button>
+                  <button onClick={()=>confirm(`"${session.name}" 운동을 제거할까요?`, ()=>removeSession(session.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer', paddingLeft:'12px' }}>제거</button>
                 </div>
                 <div style={{ height:'3px', background:'#e5e5ea', margin:'0 14px 4px', borderRadius:'2px' }}>
                   <div style={{ height:'3px', background:session.color, width:`${progress*100}%`, borderRadius:'2px', transition:'width 0.3s' }}/>
@@ -307,13 +339,15 @@ export default function App() {
                       </div>
                       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                         {Array.from({length: ex.sets}, (_, si) => {
-                          const done = ex.completedSets?.[si] ?? false
+                          const val = ex.completedSets?.[si] ?? false
+                          const done = val !== false
                           return (
                             <button key={si} onClick={()=>toggleSet(session.id, ex.id, si)} style={{
-                              width:'36px', height:'36px', borderRadius:'8px', border:`1.5px solid ${done?session.color:'#c6c6c8'}`,
+                              minWidth:'36px', height:'36px', borderRadius:'8px', padding:'0 6px',
+                              border:`1.5px solid ${done?session.color:'#c6c6c8'}`,
                               background: done?session.color:'transparent', color: done?'#fff':'#8e8e93',
-                              fontSize:'13px', fontWeight:'600', cursor:'pointer',
-                            }}>{done?'✓':si+1}</button>
+                              fontSize:'12px', fontWeight:'600', cursor:'pointer',
+                            }}>{done ? `${val}${ex.unit}` : si+1}</button>
                           )
                         })}
                       </div>
@@ -341,7 +375,7 @@ export default function App() {
                     <span style={{ fontSize:'13px', fontWeight:'600', color: doneCounts===totalCounts&&totalCounts>0?'#34c759':'#8e8e93' }}>{rate(doneCounts,totalCounts)}%</span>
                     <span style={{ color:'#8e8e93', fontSize:'14px', marginLeft:'4px' }}>{expanded?'▲':'▼'}</span>
                   </div>
-                  <button onClick={()=>removeTodoGroup(group.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer', paddingLeft:'12px' }}>제거</button>
+                  <button onClick={()=>confirm(`"${group.name}" 그룹을 제거할까요?`, ()=>removeTodoGroup(group.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer', paddingLeft:'12px' }}>제거</button>
                 </div>
                 <div style={{ height:'3px', background:'#e5e5ea', margin:'0 14px 4px', borderRadius:'2px' }}>
                   <div style={{ height:'3px', background:group.color, width:`${totalCounts===0?0:doneCounts/totalCounts*100}%`, borderRadius:'2px', transition:'width 0.3s' }}/>
@@ -392,7 +426,7 @@ export default function App() {
                     {todo.completed && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
                   <span onClick={()=>toggleTodo(todo.id)} style={{ flex:1, fontSize:'15px', color: todo.completed?'#8e8e93':'#000', textDecoration: todo.completed?'line-through':'none', cursor:'pointer' }}>{todo.text}</span>
-                  <button onClick={()=>deleteTodo(todo.id)} style={delBtn}>−</button>
+                  <button onClick={()=>confirm(`"${todo.text}" 할일을 삭제할까요?`, ()=>deleteTodo(todo.id))} style={delBtn}>−</button>
                 </div>
               ))}
             </div>
@@ -457,8 +491,9 @@ export default function App() {
             </div>
           )}
 
-          {/* 하단 추가 버튼 3종 */}
-          <div style={{ display:'flex', gap:'8px' }}>
+        </></div></div>
+          {/* 하단 추가 버튼 3종 - 고정 */}
+          <div style={{ padding:'8px 16px 10px', display:'flex', gap:'8px', background:'#f2f2f7', borderTop:'0.5px solid #e5e5ea' }}>
             <AddRowBtn active={showWorkoutPanel} onClick={()=>{ setShowWorkoutPanel(v=>!v); setShowTodoGroupPanel(false); setShowTodoInput(false) }} style={{ flex:1 }}>
               {showWorkoutPanel ? '✕' : '+ 운동'}
             </AddRowBtn>
@@ -469,10 +504,10 @@ export default function App() {
               {showTodoInput ? '✕' : '+ 할일'}
             </AddRowBtn>
           </div>
-        </></div></div>}
+        </>}
 
         {/* ════ 루틴 탭 ════ */}
-        {tab==='routine' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
+        {tab==='routine' && <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
           {/* Sub-tab */}
           {!showWorkoutForm && !showTodoTplForm && (
             <div style={{ display:'flex', background:'#e5e5ea', borderRadius:'10px', padding:'2px' }}>
@@ -496,7 +531,7 @@ export default function App() {
                     <div style={{ fontSize:'12px', color:'#8e8e93', marginTop:'2px' }}>{tpl.exercises.length}종목</div>
                   </div>
                   <button onClick={()=>openEditWorkout(tpl)} style={{ background:'none', border:'none', color:'#007aff', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>수정</button>
-                  <button onClick={()=>deleteWorkoutTpl(tpl.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>삭제</button>
+                  <button onClick={()=>confirm(`"${tpl.name}" 루틴을 삭제할까요?\n관련된 모든 기록도 삭제됩니다.`, ()=>deleteWorkoutTpl(tpl.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>삭제</button>
                 </div>
                 <div style={{ padding:'0 14px 12px', display:'flex', flexDirection:'column', gap:'4px' }}>
                   {tpl.exercises.map(ex => (
@@ -582,7 +617,7 @@ export default function App() {
                     <div style={{ fontSize:'12px', color:'#8e8e93', marginTop:'2px' }}>{tpl.items.length}항목</div>
                   </div>
                   <button onClick={()=>openEditTodoTpl(tpl)} style={{ background:'none', border:'none', color:'#007aff', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>수정</button>
-                  <button onClick={()=>deleteTodoTpl(tpl.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>삭제</button>
+                  <button onClick={()=>confirm(`"${tpl.name}" 그룹을 삭제할까요?\n관련된 모든 기록도 삭제됩니다.`, ()=>deleteTodoTpl(tpl.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'13px', fontWeight:'600', cursor:'pointer' }}>삭제</button>
                 </div>
                 <div style={{ padding:'0 14px 12px', display:'flex', flexDirection:'column', gap:'4px' }}>
                   {tpl.items.map(item => (
@@ -648,7 +683,7 @@ export default function App() {
         </></div></div>}
 
         {/* ════ 통계 탭 ════ */}
-        {tab==='stats' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
+        {tab==='stats' && <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
           {/* 검색창 */}
           <div style={{ display:'flex', alignItems:'center', background:'#fff', borderRadius:'12px', padding:'8px 12px', gap:'8px' }}>
             <span style={{ fontSize:'16px' }}>🔍</span>
@@ -836,6 +871,83 @@ export default function App() {
           </div>
         </></div></div>}
       </div>
+
+      {/* 세트 횟수 입력 모달 */}
+      {pendingSet && (() => {
+        const HALF = 2
+        const onMove = (clientY) => {
+          if (dragStartY.current === null) return
+          const rawDelta = dragStartY.current - clientY
+          const floatVal = Math.max(0, dragStartVal.current + rawDelta / 12)
+          const intVal   = Math.round(floatVal)
+          setPendingReps(intVal)
+          setWheelOffset((floatVal - intVal) * ITEM_H)
+        }
+        const onEnd = () => { dragStartY.current = null; setWheelOffset(0) }
+        return (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
+          onMouseMove={e=>onMove(e.clientY)} onMouseUp={onEnd}
+          onTouchMove={e=>{ e.preventDefault(); onMove(e.touches[0].clientY) }} onTouchEnd={onEnd}
+        >
+          <div style={{ background:'#fff', borderRadius:'14px', width:'260px', overflow:'hidden' }}>
+            <div style={{ padding:'16px 16px 8px', textAlign:'center' }}>
+              <div style={{ fontSize:'13px', color:'#8e8e93', marginBottom:'8px' }}>{pendingSet.setIdx+1}세트 실제 수행 횟수</div>
+              {/* 드럼 휠 */}
+              <div
+                onMouseDown={e=>{ dragStartY.current=e.clientY; dragStartVal.current=pendingReps }}
+                onTouchStart={e=>{ dragStartY.current=e.touches[0].clientY; dragStartVal.current=pendingReps }}
+                style={{ cursor:'ns-resize', userSelect:'none', touchAction:'none', position:'relative', height: ITEM_H*(HALF*2+1), overflow:'hidden' }}
+              >
+                {/* 선택 강조 바 */}
+                <div style={{ position:'absolute', top: HALF*ITEM_H, left:16, right:16, height:ITEM_H, background:'#f2f2f7', borderRadius:'10px', pointerEvents:'none' }}/>
+                {/* 숫자 목록 */}
+                <div style={{ transform:`translateY(${-wheelOffset - 2*ITEM_H}px)`, transition: dragStartY.current ? 'none' : 'transform 0.15s ease' }}>
+                  {Array.from({length: HALF*2+1+4}, (_, i) => {
+                    const val = pendingReps - HALF - 2 + i
+                    const dist = Math.abs(i - (HALF+2) - wheelOffset/ITEM_H)
+                    const opacity = Math.max(0, 1 - dist * 0.35)
+                    const fontSize = Math.max(18, 42 - dist * 10)
+                    return (
+                      <div key={i} style={{ height:ITEM_H, display:'flex', alignItems:'center', justifyContent:'center', opacity }}>
+                        <span style={{ fontSize, fontWeight:'700', color: val===pendingReps?'#000':'#8e8e93', transition:'font-size 0.1s' }}>
+                          {Math.max(0, val)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div style={{ fontSize:'13px', color:'#8e8e93', marginTop:'6px' }}>
+                {pendingSet.unit} &nbsp;·&nbsp; 계획: {pendingSet.plannedReps}{pendingSet.unit}
+              </div>
+            </div>
+            <div style={{ borderTop:'0.5px solid #e5e5ea', display:'flex', marginTop:'8px' }}>
+              <button onClick={()=>{ setPendingSet(null); setWheelOffset(0) }} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', color:'#8e8e93', cursor:'pointer', borderRight:'0.5px solid #e5e5ea' }}>취소</button>
+              <button onClick={confirmSet} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', fontWeight:'700', color:'#007aff', cursor:'pointer' }}>완료</button>
+            </div>
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* 확인 모달 */}
+      {modal.show && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div style={{ background:'#fff', borderRadius:'14px', width:'270px', overflow:'hidden' }}>
+            <div style={{ padding:'20px 16px 16px', textAlign:'center' }}>
+              <div style={{ fontSize:'15px', fontWeight:'600', marginBottom:'6px', lineHeight:'1.4', whiteSpace:'pre-line' }}>{modal.message}</div>
+            </div>
+            <div style={{ borderTop:'0.5px solid #e5e5ea', display:'flex' }}>
+              <button onClick={closeModal} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', fontWeight:'500', color:'#007aff', cursor:'pointer', borderRight:'0.5px solid #e5e5ea' }}>
+                취소
+              </button>
+              <button onClick={()=>{ modal.onConfirm(); closeModal() }} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', fontWeight:'700', color:'#ff3b30', cursor:'pointer' }}>
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Bar */}
       <div style={{ height:'56px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
