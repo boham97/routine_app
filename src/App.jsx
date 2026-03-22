@@ -244,7 +244,7 @@ export default function App() {
   const tabTitle = tab==='todo' ? '할 일' : tab==='routine' ? '루틴' : '통계'
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:'#f2f2f7', overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
 
       {/* Status Bar */}
       <div style={{ height:'44px', flexShrink:0, background:'#f2f2f7', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 20px', fontSize:'15px', fontWeight:'600' }}>
@@ -257,10 +257,10 @@ export default function App() {
       </div>
 
       {/* Content */}
-      <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:'12px' }}>
+      <div style={{ flex:1, minHeight:0, position:'relative' }}>
 
         {/* ════ 할일 탭 ════ */}
-        {tab==='todo' && <>
+        {tab==='todo' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
           {/* 날짜 네비게이터 */}
           <NavCard>
             <NavBtn onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</NavBtn>
@@ -469,10 +469,10 @@ export default function App() {
               {showTodoInput ? '✕' : '+ 할일'}
             </AddRowBtn>
           </div>
-        </>}
+        </></div></div>}
 
         {/* ════ 루틴 탭 ════ */}
-        {tab==='routine' && <>
+        {tab==='routine' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
           {/* Sub-tab */}
           {!showWorkoutForm && !showTodoTplForm && (
             <div style={{ display:'flex', background:'#e5e5ea', borderRadius:'10px', padding:'2px' }}>
@@ -645,10 +645,10 @@ export default function App() {
               <AddRowBtn active onClick={()=>setShowTodoTplForm(false)}>✕ 취소</AddRowBtn>
             </div>
           )}
-        </>}
+        </></div></div>}
 
         {/* ════ 통계 탭 ════ */}
-        {tab==='stats' && <>
+        {tab==='stats' && <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}><div style={{ display:'flex', flexDirection:'column', gap:'12px' }}><>
           {/* 검색창 */}
           <div style={{ display:'flex', alignItems:'center', background:'#fff', borderRadius:'12px', padding:'8px 12px', gap:'8px' }}>
             <span style={{ fontSize:'16px' }}>🔍</span>
@@ -834,11 +834,11 @@ export default function App() {
               </div>
             </div>
           </div>
-        </>}
+        </></div></div>}
       </div>
 
       {/* Tab Bar */}
-      <div style={{ height:'83px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'flex-start', paddingTop:'10px' }}>
+      <div style={{ height:'56px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
         {[
           { key:'todo',    label:'할 일', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
           { key:'routine', label:'루틴',  icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="19" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="5" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="17" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="7" y="10" width="10" height="4" rx="2" fill="currentColor"/></svg> },
