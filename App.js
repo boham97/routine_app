@@ -168,6 +168,11 @@ export default function App() {
 
   function deleteRoutine(id) { setRoutines(prev => prev.filter(r => r.id !== id)) }
 
+  // 루틴 그룹 전체 제거 (해당 날짜의 루틴 todos 일괄 삭제)
+  function removeRoutineGroup(routineId) {
+    setTodos(prev => prev.filter(t => !(t.routineId === routineId && dateKey(t.createdAt) === todoKey)))
+  }
+
   // 루틴 → 선택 날짜에 일괄 추가
   function applyRoutine(routine) {
     const createdAt = new Date(todoDate); createdAt.setHours(12,0,0,0)
@@ -246,16 +251,21 @@ export default function App() {
                 const expanded = expandedGroup[g.id] !== false
                 return (
                   <View key={g.id} style={[s.routineGroupCard, {borderTopColor: g.color}]}>
-                    <TouchableOpacity
-                      onPress={()=>setExpandedGroup(prev=>({...prev,[g.id]:!expanded}))}
-                      style={s.routineGroupHeader}>
-                      <View style={[s.routineGroupDot, {backgroundColor:g.color}]}/>
-                      <Text style={s.routineGroupName}>{g.name}</Text>
-                      <Text style={[s.routineGroupCount, {color:done===total&&total>0?'#34c759':'#8e8e93'}]}>
-                        {done}/{total}
-                      </Text>
-                      <Text style={{color:'#8e8e93',fontSize:14,marginLeft:4}}>{expanded?'▲':'▼'}</Text>
-                    </TouchableOpacity>
+                    <View style={s.routineGroupHeader}>
+                      <TouchableOpacity
+                        onPress={()=>setExpandedGroup(prev=>({...prev,[g.id]:!expanded}))}
+                        style={{flex:1,flexDirection:'row',alignItems:'center',gap:6}}>
+                        <View style={[s.routineGroupDot, {backgroundColor:g.color}]}/>
+                        <Text style={s.routineGroupName}>{g.name}</Text>
+                        <Text style={[s.routineGroupCount, {color:done===total&&total>0?'#34c759':'#8e8e93'}]}>
+                          {done}/{total}
+                        </Text>
+                        <Text style={{color:'#8e8e93',fontSize:14,marginLeft:4}}>{expanded?'▲':'▼'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={()=>removeRoutineGroup(g.id)} style={{paddingHorizontal:8,paddingVertical:4}}>
+                        <Text style={{color:'#ff3b30',fontSize:13,fontWeight:'600'}}>제거</Text>
+                      </TouchableOpacity>
+                    </View>
                     <View style={s.progressBg}>
                       <View style={[s.progressFill, {width:`${progress*100}%`, backgroundColor:g.color}]}/>
                     </View>
@@ -277,9 +287,6 @@ export default function App() {
                             </View>
                           )}
                         </View>
-                        <TouchableOpacity onPress={()=>deleteTodo(todo.id)} style={s.deleteBtn}>
-                          <Text style={s.deleteBtnText}>−</Text>
-                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>
@@ -320,7 +327,7 @@ export default function App() {
                     <>
                       <Text style={s.formTitle}>루틴 선택</Text>
                       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-                        {routines.map(r=>(
+                        {routines.filter(r=>!grouped.groups.some(g=>g.id===r.id)).map(r=>(
                           <TouchableOpacity key={r.id}
                             onPress={()=>{ applyRoutine(r); setShowInput(false) }}
                             style={[s.chip,{borderColor:r.color}]}>
@@ -328,6 +335,9 @@ export default function App() {
                             <Text style={[s.chipText,{color:r.color,fontWeight:'600'}]}>{r.name}</Text>
                           </TouchableOpacity>
                         ))}
+                        {routines.filter(r=>!grouped.groups.some(g=>g.id===r.id)).length===0&&(
+                          <Text style={{color:'#8e8e93',fontSize:14}}>모든 루틴이 추가되었습니다</Text>
+                        )}
                       </View>
                     </>
                   )}

@@ -544,7 +544,7 @@ export default function App() {
                         border: '2px solid #c6c6c8', background: 'transparent',
                       }} />
                       <span style={{ flex: 1 }}>{task.text}</span>
-                      {editingRoutine === r.id && (
+                      {false && (
                         <button
                           onClick={() => removeTaskFromTemplate(r.id, task.id)}
                           style={{
