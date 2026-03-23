@@ -57,10 +57,25 @@ export default function App() {
   const dragStartY = useRef(null)
   const dragStartVal = useRef(0)
   const restTimerRef = useRef(null)
+  const [restSec, setRestSec] = useState(null)
+  const audioCtxRef = useRef(null)
+
+  // ── 초 단위 운동 타이머 ────────────────────────────────────
+  const exTimerIntervalRef = useRef(null)
+  const [exTimer, setExTimer] = useState(null) // { sessionId, exerciseId, setIdx, remaining, total }
+
+  function initAudioCtx() {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+    } else if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume()
+    }
+  }
 
   function playBeep() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const ctx = audioCtxRef.current
+      if (!ctx) return
       const beep = (freq, start, dur) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
@@ -137,6 +152,12 @@ export default function App() {
   const appliedTodoTplIds      = groupsForDay.map(g => g.templateId)
   const availableTodoTemplates = todoTemplates.filter(t => !appliedTodoTplIds.includes(t.id))
 
+  // exTimer: elapsed가 total에 도달하면 알림음만 (완료는 탭으로)
+  useEffect(() => {
+    if (exTimer?.elapsed !== exTimer?.total) return
+    playBeep()
+  }, [exTimer])
+
   // ── 운동 CRUD ──────────────────────────────────────────────
   function applyWorkoutTemplate(tpl) {
     if (workoutSessions.find(s => s.templateId === tpl.id && s.date === selKey)) return
@@ -148,11 +169,39 @@ export default function App() {
     setExpandedSession(p => ({ ...p, [session.id]: true }))
     setShowWorkoutPanel(false)
   }
-  function removeSession(id) { setWorkoutSessions(p => p.filter(s => s.id !== id)) }
+  function removeSession(id) {
+    if (exTimer?.sessionId === id) { clearInterval(exTimerIntervalRef.current); setExTimer(null) }
+    setWorkoutSessions(p => p.filter(s => s.id !== id))
+  }
   function toggleSet(sessionId, exerciseId, setIdx) {
     const session = workoutSessions.find(s => s.id === sessionId)
     const ex = session?.exercises.find(e => e.id === exerciseId)
     const cur = ex?.completedSets?.[setIdx] ?? false
+
+    // 이 세트의 타이머가 돌고 있으면 실제 경과 시간으로 기록
+    if (exTimer && exTimer.sessionId === sessionId && exTimer.exerciseId === exerciseId && exTimer.setIdx === setIdx) {
+      clearInterval(exTimerIntervalRef.current)
+      const actual = exTimer.elapsed
+      setExTimer(null)
+      setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
+        ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
+          ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
+            i === setIdx ? actual : (e.completedSets?.[i] ?? false)
+          )
+        })
+      }))
+      initAudioCtx()
+      if (restTimerRef.current) clearInterval(restTimerRef.current)
+      setRestSec(60)
+      restTimerRef.current = setInterval(() => {
+        setRestSec(prev => {
+          if (prev <= 1) { clearInterval(restTimerRef.current); restTimerRef.current = null; playBeep(); return null }
+          return prev - 1
+        })
+      }, 1000)
+      return
+    }
+
     if (cur !== false) {
       setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
         ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
@@ -161,6 +210,18 @@ export default function App() {
           )
         })
       }))
+    } else if (ex?.unit === '초') {
+      // 초 단위: 카운트다운 타이머 시작
+      initAudioCtx()
+      clearInterval(exTimerIntervalRef.current)
+      const total = ex.reps
+      setExTimer({ sessionId, exerciseId, setIdx, elapsed: 0, total })
+      exTimerIntervalRef.current = setInterval(() => {
+        setExTimer(prev => {
+          if (!prev) { clearInterval(exTimerIntervalRef.current); return null }
+          return { ...prev, elapsed: prev.elapsed + 1 }
+        })
+      }, 1000)
     } else {
       setPendingSet({ sessionId, exerciseId, setIdx, plannedReps: ex?.reps ?? 0, unit: ex?.unit ?? '회' })
       setPendingReps(ex?.reps ?? 0)
@@ -176,9 +237,21 @@ export default function App() {
       })
     }))
     setPendingSet(null)
-    // 1분 휴식 타이머
-    if (restTimerRef.current) clearTimeout(restTimerRef.current)
-    restTimerRef.current = setTimeout(playBeep, 60000)
+    // 1분 휴식 타이머 (iOS용: 유저 터치 시점에 AudioContext 초기화)
+    initAudioCtx()
+    if (restTimerRef.current) clearInterval(restTimerRef.current)
+    setRestSec(60)
+    restTimerRef.current = setInterval(() => {
+      setRestSec(prev => {
+        if (prev <= 1) {
+          clearInterval(restTimerRef.current)
+          restTimerRef.current = null
+          playBeep()
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   const sessionsForDay     = workoutSessions.filter(s => s.date === selKey)
@@ -281,10 +354,12 @@ export default function App() {
   return (
     <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
 
-      {/* Status Bar */}
-      <div style={{ height:'44px', flexShrink:0, background:'#f2f2f7', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 20px', fontSize:'15px', fontWeight:'600' }}>
-        <span>9:41</span><span>●●●</span>
-      </div>
+      {/* 휴식 타이머 */}
+      {restSec !== null && (
+        <div style={{ background: restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flexShrink:0 }}>
+          휴식 {restSec}초 남음
+        </div>
+      )}
 
       {/* Content */}
       <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
@@ -293,7 +368,7 @@ export default function App() {
           <TodoTab
             selectedDate={selectedDate} setSelectedDate={setSelectedDate}
             labelForDate={labelForDate}
-            sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet}
+            sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} exTimer={exTimer}
             groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
             toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
             todosForDay={todosForDay} toggleTodo={toggleTodo} deleteTodo={deleteTodo}

@@ -5,7 +5,7 @@ import { NavCard, NavBtn, EmptyCard, AddRowBtn } from './ui.jsx'
 export default function TodoTab({
   selectedDate, setSelectedDate,
   labelForDate,
-  sessionsForDay, expandedSession, setExpandedSession, toggleSet,
+  sessionsForDay, expandedSession, setExpandedSession, toggleSet, exTimer,
   groupsForDay, expandedTodoGroup, setExpandedTodoGroup, toggleGroupItemCount, removeTodoGroup,
   todosForDay, toggleTodo, deleteTodo,
   showTodoInput, setShowTodoInput, todoInput, setTodoInput, addTodo,
@@ -69,13 +69,20 @@ export default function TodoTab({
                       {Array.from({length: ex.sets}, (_, si) => {
                         const val = ex.completedSets?.[si] ?? false
                         const done = val !== false
+                        const isRunning = exTimer && exTimer.sessionId === session.id && exTimer.exerciseId === ex.id && exTimer.setIdx === si
+                        const isOvertime = isRunning && exTimer.elapsed >= exTimer.total
+                        const btnColor = isRunning ? (isOvertime ? '#ff3b30' : '#ff9500') : (done ? session.color : 'transparent')
+                        const borderColor = btnColor === 'transparent' ? '#c6c6c8' : btnColor
+                        const label = isRunning
+                          ? (isOvertime ? `+${exTimer.elapsed - exTimer.total}초` : `${exTimer.total - exTimer.elapsed}초`)
+                          : (done ? `${val}${ex.unit}` : si+1)
                         return (
                           <button key={si} onClick={()=>toggleSet(session.id, ex.id, si)} style={{
                             minWidth:'36px', height:'36px', borderRadius:'8px', padding:'0 6px',
-                            border:`1.5px solid ${done?session.color:'#c6c6c8'}`,
-                            background: done?session.color:'transparent', color: done?'#fff':'#8e8e93',
+                            border:`1.5px solid ${borderColor}`,
+                            background: btnColor, color: (done || isRunning) ?'#fff':'#8e8e93',
                             fontSize:'12px', fontWeight:'600', cursor:'pointer',
-                          }}>{done ? `${val}${ex.unit}` : si+1}</button>
+                          }}>{label}</button>
                         )
                       })}
                     </div>
