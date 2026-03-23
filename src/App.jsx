@@ -56,6 +56,23 @@ export default function App() {
   const [wheelOffset, setWheelOffset] = useState(0)
   const dragStartY = useRef(null)
   const dragStartVal = useRef(0)
+  const restTimerRef = useRef(null)
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const beep = (freq, start, dur) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = freq; osc.type = 'sine'
+        gain.gain.setValueAtTime(0.7, ctx.currentTime + start)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur)
+        osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur)
+      }
+      beep(880, 0, 0.15); beep(880, 0.2, 0.15); beep(1100, 0.4, 0.4)
+    } catch {}
+  }
 
   // ── 통계 ───────────────────────────────────────────────────
   const now = new Date()
@@ -159,6 +176,9 @@ export default function App() {
       })
     }))
     setPendingSet(null)
+    // 1분 휴식 타이머
+    if (restTimerRef.current) clearTimeout(restTimerRef.current)
+    restTimerRef.current = setTimeout(playBeep, 60000)
   }
 
   const sessionsForDay     = workoutSessions.filter(s => s.date === selKey)

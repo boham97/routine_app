@@ -84,7 +84,7 @@ export default function RoutineTab({
                         <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:wColor, flexShrink:0 }}/>
                         <span style={{ flex:1, fontSize:'14px' }}>{ex.name}</span>
                         <span style={{ fontSize:'12px', color:'#8e8e93', marginRight:'8px' }}>{ex.sets}×{ex.reps}{ex.unit}</span>
-                        <button onClick={()=>removeExercise(ex.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'16px', cursor:'pointer' }}>✕</button>
+                        <button onClick={()=>confirm(`"${ex.name}" 종목을 삭제할까요?`, ()=>removeExercise(ex.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'16px', cursor:'pointer' }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -170,7 +170,7 @@ export default function RoutineTab({
                         <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:ttColor, flexShrink:0 }}/>
                         <span style={{ flex:1, fontSize:'14px' }}>{item.text}</span>
                         {item.count > 1 && <span style={{ fontSize:'12px', color:'#8e8e93', marginRight:'8px' }}>{item.count}회</span>}
-                        <button onClick={()=>removeTtItem(item.id)} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'16px', cursor:'pointer' }}>✕</button>
+                        <button onClick={()=>confirm(`"${item.text}" 항목을 삭제할까요?`, ()=>removeTtItem(item.id))} style={{ background:'none', border:'none', color:'#ff3b30', fontSize:'16px', cursor:'pointer' }}>✕</button>
                       </div>
                     ))}
                   </div>

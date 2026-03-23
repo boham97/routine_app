@@ -6,7 +6,7 @@ export function DrumWheelModal({ pendingSet, setPendingSet, pendingReps, setPend
   const onMove = (clientY) => {
     if (dragStartY.current === null) return
     const rawDelta = dragStartY.current - clientY
-    const floatVal = Math.max(0, dragStartVal.current + rawDelta / 12)
+    const floatVal = Math.max(0, dragStartVal.current + rawDelta / 36)
     const intVal   = Math.round(floatVal)
     setPendingReps(intVal)
     setWheelOffset((floatVal - intVal) * ITEM_H)
