@@ -6,15 +6,19 @@ import StatsTab from './components/StatsTab.jsx'
 import { DrumWheelModal, ConfirmModal } from './components/Modals.jsx'
 
 export default function App() {
-  const [tab, setTab] = useState('todo')
   const TABS = ['todo', 'routine', 'stats']
-  const tabSwipeTx = useRef(null)
-  const tabSwipeTy = useRef(null)
-  const tabSwipeIsH = useRef(false)
+  const [tabIdx,   setTabIdx]   = useState(0)
+  const [swipeDx,  setSwipeDx]  = useState(0)
+  const tab = TABS[tabIdx]
+  function setTab(key) { setTabIdx(TABS.indexOf(key)); setSwipeDx(0) }
+
+  const tabSwipeTx    = useRef(null)
+  const tabSwipeTy    = useRef(null)
+  const tabSwipeIsH   = useRef(false)
 
   function onTabSwipeStart(e) {
-    tabSwipeTx.current = e.touches[0].clientX
-    tabSwipeTy.current = e.touches[0].clientY
+    tabSwipeTx.current  = e.touches[0].clientX
+    tabSwipeTy.current  = e.touches[0].clientY
     tabSwipeIsH.current = false
   }
   function onTabSwipeMove(e) {
@@ -23,16 +27,22 @@ export default function App() {
     const dy = e.touches[0].clientY - tabSwipeTy.current
     if (!tabSwipeIsH.current && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
     if (!tabSwipeIsH.current) tabSwipeIsH.current = Math.abs(dx) > Math.abs(dy)
+    if (!tabSwipeIsH.current) return
+    // 첫/마지막 탭에서 더 이상 못 넘어가도록 클램프
+    const clamped = tabIdx === 0 ? Math.min(0, dx)
+                  : tabIdx === TABS.length - 1 ? Math.max(0, dx)
+                  : dx
+    setSwipeDx(clamped)
   }
   function onTabSwipeEnd(e) {
     if (!tabSwipeIsH.current) return
     const dx = e.changedTouches[0].clientX - (tabSwipeTx.current ?? 0)
     tabSwipeTx.current = null
+    setSwipeDx(0)   // transition으로 snap
     if (Math.abs(dx) < 60) return
-    setTab(prev => {
-      const i = TABS.indexOf(prev)
-      if (dx < 0 && i < TABS.length - 1) return TABS[i + 1]
-      if (dx > 0 && i > 0) return TABS[i - 1]
+    setTabIdx(prev => {
+      if (dx < 0 && prev < TABS.length - 1) return prev + 1
+      if (dx > 0 && prev > 0) return prev - 1
       return prev
     })
   }
@@ -134,6 +144,13 @@ export default function App() {
   const todayKey = dateKey(getToday())
   const selKey   = dateKey(selectedDate)
 
+  function getMondayOfWeek(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00')
+    const day = d.getDay()
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
+    return dateKey(d)
+  }
+
   const labelForDate = d => {
     const key = dateKey(d)
     if (key === todayKey) return '오늘'
@@ -149,11 +166,11 @@ export default function App() {
     if (taskType === 'workout') {
       base.goalMode = goalMode
       if (goalMode === 'reps') {
-        const s = Math.max(1, parseInt(sets) || 3)
+        const s = Math.max(1, parseInt(sets) || 4)
         base.sets = s; base.reps = parseInt(reps) || 10
         base.completedSets = Array(s).fill(false)
       } else {
-        const s = Math.max(1, parseInt(sets) || 3)
+        const s = Math.max(1, parseInt(sets) || 4)
         base.sets = s; base.seconds = parseInt(seconds) || 60
         base.completedSets = Array(s).fill(false)
       }
@@ -187,15 +204,45 @@ export default function App() {
   const todosForDay    = todos.filter(t => dateKey(t.createdAt) === selKey)
   const tasksForToday  = todos.filter(t => dateKey(t.createdAt) === todayKey)
 
+  // ── 플랜 일회성 태스크 ─────────────────────────────────────
+  const [planTasks, setPlanTasks] = useState(() => load('planTasks', []))
+  useEffect(() => { localStorage.setItem('planTasks', JSON.stringify(planTasks)) }, [planTasks])
+
+  function addPlanTask(text, date) {
+    setPlanTasks(p => [...p, { id: Date.now(), text: text.trim(), date, completed: false }])
+  }
+  function removePlanTask(id) { setPlanTasks(p => p.filter(t => t.id !== id)) }
+  function togglePlanTask(id) { setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t)) }
+
+  const planTasksForDay = planTasks.filter(t => t.date === selKey)
+
   // ── 할일 그룹 CRUD ─────────────────────────────────────────
-  function applyTodoTemplate(tpl) {
-    if (todoGroups.find(g => g.templateId === tpl.id && g.date === selKey)) return
-    const group = {
-      id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
-      items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) }))
+  function applyTodoTemplate(tpl, scope = 'today') {
+    if (scope === 'today') {
+      if (todoGroups.find(g => g.templateId === tpl.id && g.date === selKey)) return
+      const group = {
+        id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
+        items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) }))
+      }
+      setTodoGroups(p => [...p, group])
+      setExpandedTodoGroup(p => ({ ...p, [group.id]: true }))
+    } else {
+      const base = Date.now()
+      const monday = new Date(getMondayOfWeek(selKey) + 'T00:00:00')
+      const toAdd = []
+      for (let i = 0; i < 7; i++) {
+        const dKey = dateKey(addDays(monday, i))
+        if (!todoGroups.find(g => g.templateId === tpl.id && g.date === dKey)) {
+          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, color: tpl.color, date: dKey, isWeekly: true,
+            items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) })) })
+        }
+      }
+      if (toAdd.length > 0) {
+        setTodoGroups(p => [...p, ...toAdd])
+        const exp = {}; toAdd.forEach(g => { exp[g.id] = true })
+        setExpandedTodoGroup(p => ({ ...p, ...exp }))
+      }
     }
-    setTodoGroups(p => [...p, group])
-    setExpandedTodoGroup(p => ({ ...p, [group.id]: true }))
   }
   function removeTodoGroup(id) { setTodoGroups(p => p.filter(g => g.id !== id)) }
   function toggleGroupItemCount(groupId, itemId, idx) {
@@ -217,14 +264,32 @@ export default function App() {
   }, [exTimer])
 
   // ── 운동 CRUD ──────────────────────────────────────────────
-  function applyWorkoutTemplate(tpl) {
-    if (workoutSessions.find(s => s.templateId === tpl.id && s.date === selKey)) return
-    const session = {
-      id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
-      exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) }))
+  function applyWorkoutTemplate(tpl, scope = 'today') {
+    if (scope === 'today') {
+      if (workoutSessions.find(s => s.templateId === tpl.id && s.date === selKey)) return
+      const session = {
+        id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
+        exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) }))
+      }
+      setWorkoutSessions(p => [...p, session])
+      setExpandedSession(p => ({ ...p, [session.id]: true }))
+    } else {
+      const base = Date.now()
+      const monday = new Date(getMondayOfWeek(selKey) + 'T00:00:00')
+      const toAdd = []
+      for (let i = 0; i < 7; i++) {
+        const dKey = dateKey(addDays(monday, i))
+        if (!workoutSessions.find(s => s.templateId === tpl.id && s.date === dKey)) {
+          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, color: tpl.color, date: dKey, isWeekly: true,
+            exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) })) })
+        }
+      }
+      if (toAdd.length > 0) {
+        setWorkoutSessions(p => [...p, ...toAdd])
+        const exp = {}; toAdd.forEach(s => { exp[s.id] = true })
+        setExpandedSession(p => ({ ...p, ...exp }))
+      }
     }
-    setWorkoutSessions(p => [...p, session])
-    setExpandedSession(p => ({ ...p, [session.id]: true }))
   }
   function removeSession(id) {
     if (exTimer?.sessionId === id) { clearInterval(exTimerIntervalRef.current); setExTimer(null) }
@@ -381,6 +446,20 @@ export default function App() {
     setTodoGroups(p => p.filter(g => g.templateId !== id))
   }
 
+  // ── 그룹 간편 추가 (RoutineTab용) ─────────────────────────
+  function addWorkoutGroup(name, color, exercises) {
+    setWorkoutTemplates(p => [...p, { id: Date.now(), name: name.trim(), color, exercises }])
+  }
+  function updateWorkoutGroup(id, changes) {
+    setWorkoutTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
+  }
+  function addGeneralGroup(name, color, items) {
+    setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), color, items }])
+  }
+  function updateGeneralGroup(id, changes) {
+    setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
+  }
+
   // ── 확인 모달 ──────────────────────────────────────────────
   const [modal, setModal] = useState({ show: false, message: '', onConfirm: null })
   function confirm(message, onConfirm) { setModal({ show: true, message, onConfirm }) }
@@ -399,11 +478,20 @@ export default function App() {
   const doneSetsVM = allSetsVM.filter(Boolean)
 
   const monthlyData = MONTHS.map((_,mi) => {
-    const t = todos.filter(t=>{ const d=new Date(t.createdAt); return d.getFullYear()===viewYear&&d.getMonth()===mi })
+    const monthStr = `${viewYear}-${String(mi+1).padStart(2,'0')}`
+    const t  = todos.filter(t=>{ const d=new Date(t.createdAt); return d.getFullYear()===viewYear&&d.getMonth()===mi && t.taskType !== 'workout' })
+    const pt = planTasks.filter(t => t.date.startsWith(monthStr))
+    const tg = todoGroups.filter(g => g.date.startsWith(monthStr))
+    const tgTotal = tg.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
+    const tgDone  = tg.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
     const s = workoutSessions.filter(s=>{ const d=new Date(s.date); return d.getFullYear()===viewYear&&d.getMonth()===mi })
     const totalSets = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).length
     const doneSets  = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).filter(Boolean).length
-    return { todoAdded: t.length, todoDone: t.filter(x=>x.completed).length, totalSets, doneSets }
+    return {
+      todoAdded: t.length + pt.length + tgTotal,
+      todoDone:  t.filter(x=>x.completed).length + pt.filter(x=>x.completed).length + tgDone,
+      totalSets, doneSets
+    }
   })
   const maxTodo = Math.max(...monthlyData.map(m=>m.todoAdded), 1)
   const maxSets = Math.max(...monthlyData.map(m=>m.totalSets), 1)
@@ -418,46 +506,66 @@ export default function App() {
         </div>
       )}
 
-      {/* Content */}
+      {/* Content — 슬라이딩 탭 컨테이너 */}
       <div
         onTouchStart={onTabSwipeStart}
         onTouchMove={onTabSwipeMove}
         onTouchEnd={onTabSwipeEnd}
-        style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}
+        style={{ flex:1, minHeight:0, overflow:'hidden', position:'relative' }}
       >
+        <div style={{
+          display: 'flex',
+          width: '300%',
+          height: '100%',
+          transform: `translateX(calc(${-tabIdx * (100/3)}% + ${swipeDx}px))`,
+          transition: swipeDx !== 0 ? 'none' : 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          willChange: 'transform',
+        }}>
 
-        {tab==='todo' && (
-          <TodoTab
-            selectedDate={selectedDate} setSelectedDate={setSelectedDate}
-            labelForDate={labelForDate}
-            sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} exTimer={exTimer}
-            groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
-            toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
-            removeSession={removeSession}
-            confirm={confirm} rate={rate}
-          />
-        )}
+          {/* 플랜 탭 */}
+          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+            <TodoTab
+              selectedDate={selectedDate} setSelectedDate={setSelectedDate}
+              labelForDate={labelForDate}
+              sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} exTimer={exTimer}
+              groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
+              toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
+              removeSession={removeSession}
+              confirm={confirm} rate={rate}
+              availableWorkoutTpls={availableTemplates} applyWorkoutTemplate={applyWorkoutTemplate}
+              availableTodoTpls={availableTodoTemplates} applyTodoTemplate={applyTodoTemplate}
+              planTasksForDay={planTasksForDay}
+              addPlanTask={text => addPlanTask(text, selKey)}
+              removePlanTask={removePlanTask} togglePlanTask={togglePlanTask}
+            />
+          </div>
 
-        {tab==='routine' && (
-          <RoutineTab
-            addTask={addTask} tasks={tasksForToday}
-            toggleTaskSet={toggleTaskSet}
-            deleteTodo={deleteTodo} updateTask={updateTask} confirm={confirm} rate={rate}
-          />
-        )}
+          {/* 루틴 탭 */}
+          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+            <RoutineTab
+              addTask={addTask} tasks={tasksForToday}
+              toggleTaskSet={toggleTaskSet}
+              deleteTodo={deleteTodo} updateTask={updateTask} confirm={confirm} rate={rate}
+              workoutTemplates={workoutTemplates} addWorkoutGroup={addWorkoutGroup} updateWorkoutGroup={updateWorkoutGroup} deleteWorkoutTpl={deleteWorkoutTpl}
+              todoTemplates={todoTemplates} addGeneralGroup={addGeneralGroup} updateGeneralGroup={updateGeneralGroup} deleteTodoTpl={deleteTodoTpl}
+            />
+          </div>
 
-        {tab==='stats' && (
-          <StatsTab
-            statsSearch={statsSearch} setStatsSearch={setStatsSearch}
-            todos={todos} workoutSessions={workoutSessions}
-            viewYear={viewYear} setViewYear={setViewYear} viewMonth={viewMonth} setViewMonth={setViewMonth}
-            thisYear={thisYear} isCurrentMonth={isCurrentMonth} prevMonth={prevMonth} nextMonth={nextMonth}
-            todosVM={todosVM} todosVY={todosVY} sessionsVM={sessionsVM} allSetsVM={allSetsVM} doneSetsVM={doneSetsVM}
-            monthlyData={monthlyData} maxTodo={maxTodo} maxSets={maxSets}
-            rate={rate}
-          />
-        )}
+          {/* 통계 탭 */}
+          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+            <StatsTab
+              statsSearch={statsSearch} setStatsSearch={setStatsSearch}
+              todos={todos} workoutSessions={workoutSessions}
+              planTasks={planTasks} todoGroups={todoGroups}
+              viewYear={viewYear} setViewYear={setViewYear} viewMonth={viewMonth} setViewMonth={setViewMonth}
+              thisYear={thisYear} isCurrentMonth={isCurrentMonth} prevMonth={prevMonth} nextMonth={nextMonth}
+              todosVM={todosVM} todosVY={todosVY} sessionsVM={sessionsVM} allSetsVM={allSetsVM} doneSetsVM={doneSetsVM}
+              monthlyData={monthlyData} maxTodo={maxTodo} maxSets={maxSets}
+              rate={rate}
+            />
+          </div>
 
+        </div>
       </div>
 
       {/* 드럼휠 모달 */}
