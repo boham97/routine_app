@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { MONTHS, PALETTE, dateKey, addDays, getToday, load } from './constants.js'
+import { PALETTE, dateKey, addDays, getToday, load } from './constants.js'
 import TodoTab from './components/TodoTab.jsx'
 import RoutineTab from './components/RoutineTab.jsx'
 import StatsTab from './components/StatsTab.jsx'
@@ -127,11 +127,6 @@ export default function App() {
   }
 
   // ── 통계 ───────────────────────────────────────────────────
-  const now = new Date()
-  const thisYear = now.getFullYear(); const thisMonth = now.getMonth()
-  const [viewYear,    setViewYear]    = useState(thisYear)
-  const [viewMonth,   setViewMonth]   = useState(thisMonth)
-  const [statsSearch, setStatsSearch] = useState('')
 
   // ── localStorage 동기화 ────────────────────────────────────
   useEffect(() => { localStorage.setItem('todos',            JSON.stringify(todos))            }, [todos])
@@ -466,34 +461,7 @@ export default function App() {
   function closeModal() { setModal({ show: false, message: '', onConfirm: null }) }
 
   // ── 통계 helpers ───────────────────────────────────────────
-  const isCurrentMonth = viewYear === thisYear && viewMonth === thisMonth
-  function prevMonth() { viewMonth===0?(setViewMonth(11),setViewYear(y=>y-1)):setViewMonth(m=>m-1) }
-  function nextMonth() { viewMonth===11?(setViewMonth(0),setViewYear(y=>y+1)):setViewMonth(m=>m+1) }
   const rate = (done, total) => total===0 ? 0 : Math.round((done/total)*100)
-
-  const todosVM    = todos.filter(t => { const d=new Date(t.createdAt); return d.getFullYear()===viewYear&&d.getMonth()===viewMonth })
-  const todosVY    = todos.filter(t => new Date(t.createdAt).getFullYear()===viewYear)
-  const sessionsVM = workoutSessions.filter(s => { const d=new Date(s.date); return d.getFullYear()===viewYear&&d.getMonth()===viewMonth })
-  const allSetsVM  = sessionsVM.flatMap(s => s.exercises.flatMap(e => e.completedSets))
-  const doneSetsVM = allSetsVM.filter(Boolean)
-
-  const monthlyData = MONTHS.map((_,mi) => {
-    const monthStr = `${viewYear}-${String(mi+1).padStart(2,'0')}`
-    const pt = planTasks.filter(t => t.date.startsWith(monthStr))
-    const tg = todoGroups.filter(g => g.date.startsWith(monthStr))
-    const tgTotal = tg.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
-    const tgDone  = tg.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
-    const s = workoutSessions.filter(s=>{ const d=new Date(s.date); return d.getFullYear()===viewYear&&d.getMonth()===mi })
-    const totalSets = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).length
-    const doneSets  = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).filter(Boolean).length
-    return {
-      todoAdded: pt.length + tgTotal,
-      todoDone:  pt.filter(x=>x.completed).length + tgDone,
-      totalSets, doneSets
-    }
-  })
-  const maxTodo = Math.max(...monthlyData.map(m=>m.todoAdded), 1)
-  const maxSets = Math.max(...monthlyData.map(m=>m.totalSets), 1)
 
   return (
     <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
@@ -553,13 +521,8 @@ export default function App() {
           {/* 통계 탭 */}
           <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <StatsTab
-              statsSearch={statsSearch} setStatsSearch={setStatsSearch}
-              todos={todos} workoutSessions={workoutSessions}
+              workoutSessions={workoutSessions}
               planTasks={planTasks} todoGroups={todoGroups}
-              viewYear={viewYear} viewMonth={viewMonth} setViewMonth={setViewMonth}
-              isCurrentMonth={isCurrentMonth} prevMonth={prevMonth} nextMonth={nextMonth}
-              todosVM={todosVM} sessionsVM={sessionsVM} allSetsVM={allSetsVM} doneSetsVM={doneSetsVM}
-              monthlyData={monthlyData} maxTodo={maxTodo} maxSets={maxSets}
               rate={rate}
             />
           </div>

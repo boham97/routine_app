@@ -164,9 +164,8 @@ export default function TodoTab({
                     <div style={{ fontSize: '11px', color: '#8e8e93', marginTop: '1px' }}>{doneSets}/{totalSets} 세트</div>
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: doneSets === totalSets && totalSets > 0 ? '#34c759' : '#8e8e93' }}>{rate(doneSets, totalSets)}%</span>
-                  <span style={{ color: '#8e8e93', fontSize: '14px', marginLeft: '4px' }}>{expanded ? '▲' : '▼'}</span>
                 </div>
-                <button onClick={() => confirm(`"${session.name}" 운동을 제거할까요?`, () => removeSession(session.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>
+                {expanded && <button onClick={() => confirm(`"${session.name}" 운동을 제거할까요?`, () => removeSession(session.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>
               <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
                 <div style={{ height: '3px', background: session.color, width: `${progress * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
@@ -225,9 +224,8 @@ export default function TodoTab({
                     <div style={{ fontSize: '11px', color: doneCounts === totalCounts && totalCounts > 0 ? '#34c759' : '#8e8e93', marginTop: '1px' }}>{doneCounts}/{totalCounts} 완료</div>
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: doneCounts === totalCounts && totalCounts > 0 ? '#34c759' : '#8e8e93' }}>{rate(doneCounts, totalCounts)}%</span>
-                  <span style={{ color: '#8e8e93', fontSize: '14px', marginLeft: '4px' }}>{expanded ? '▲' : '▼'}</span>
                 </div>
-                <button onClick={() => confirm(`"${group.name}" 그룹을 제거할까요?`, () => removeTodoGroup(group.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>
+                {expanded && <button onClick={() => confirm(`"${group.name}" 그룹을 제거할까요?`, () => removeTodoGroup(group.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>
               <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
                 <div style={{ height: '3px', background: group.color, width: `${totalCounts === 0 ? 0 : doneCounts / totalCounts * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>

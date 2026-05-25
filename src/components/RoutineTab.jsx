@@ -495,10 +495,7 @@ export default function RoutineTab({
             <span style={{ flex: 1, textAlign: 'center', fontSize: '17px', fontWeight: '600', color: '#000' }}>
               {wgTarget ? '그룹 수정' : '새 운동 그룹'}
             </span>
-            <button
-              onClick={saveWgDetail}
-              style={{ background: 'none', border: 'none', color: wgdName.trim() && wgdSelectedIds.length > 0 ? '#007aff' : '#c6c6c8', fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '8px 12px' }}
-            >완료</button>
+            <div style={{ width: '60px' }}/>
           </div>
 
           {/* 컨텐츠 */}
@@ -547,13 +544,20 @@ export default function RoutineTab({
               )}
             </div>
 
-            {/* 삭제 (기존 그룹 수정 시) */}
-            {wgTarget && (
+            {/* 하단 버튼 */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              {wgTarget && (
+                <button
+                  onClick={() => confirm(`"${wgTarget.name}" 그룹을 삭제할까요?`, () => { deleteWorkoutTpl(wgTarget.id); closeWgDetail() })}
+                  style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+                >삭제</button>
+              )}
               <button
-                onClick={() => confirm(`"${wgTarget.name}" 그룹을 삭제할까요?`, () => { deleteWorkoutTpl(wgTarget.id); closeWgDetail() })}
-                style={{ width: '100%', height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}
-              >그룹 삭제</button>
-            )}
+                onClick={saveWgDetail}
+                disabled={!(wgdName.trim() && wgdSelectedIds.length > 0)}
+                style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: wgdName.trim() && wgdSelectedIds.length > 0 ? '#007aff' : '#e5e5ea', color: wgdName.trim() && wgdSelectedIds.length > 0 ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+              >완료</button>
+            </div>
           </div>
         </div>
       )}
@@ -575,10 +579,7 @@ export default function RoutineTab({
             <span style={{ flex: 1, textAlign: 'center', fontSize: '17px', fontWeight: '600', color: '#000' }}>
               {ggTarget ? '그룹 수정' : '새 일반 그룹'}
             </span>
-            <button
-              onClick={saveGgDetail}
-              style={{ background: 'none', border: 'none', color: ggdName.trim() && ggdSelectedIds.length > 0 ? '#007aff' : '#c6c6c8', fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '8px 12px' }}
-            >완료</button>
+            <div style={{ width: '60px' }}/>
           </div>
 
           {/* 컨텐츠 */}
@@ -626,13 +627,20 @@ export default function RoutineTab({
               )}
             </div>
 
-            {/* 삭제 (기존 그룹 수정 시) */}
-            {ggTarget && (
+            {/* 하단 버튼 */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              {ggTarget && (
+                <button
+                  onClick={() => confirm(`"${ggTarget.name}" 그룹을 삭제할까요?`, () => { deleteTodoTpl(ggTarget.id); closeGgDetail() })}
+                  style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+                >삭제</button>
+              )}
               <button
-                onClick={() => confirm(`"${ggTarget.name}" 그룹을 삭제할까요?`, () => { deleteTodoTpl(ggTarget.id); closeGgDetail() })}
-                style={{ width: '100%', height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}
-              >그룹 삭제</button>
-            )}
+                onClick={saveGgDetail}
+                disabled={!(ggdName.trim() && ggdSelectedIds.length > 0)}
+                style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: ggdName.trim() && ggdSelectedIds.length > 0 ? '#007aff' : '#e5e5ea', color: ggdName.trim() && ggdSelectedIds.length > 0 ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+              >완료</button>
+            </div>
           </div>
         </div>
       )}
