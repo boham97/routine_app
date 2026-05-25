@@ -479,7 +479,6 @@ export default function App() {
 
   const monthlyData = MONTHS.map((_,mi) => {
     const monthStr = `${viewYear}-${String(mi+1).padStart(2,'0')}`
-    const t  = todos.filter(t=>{ const d=new Date(t.createdAt); return d.getFullYear()===viewYear&&d.getMonth()===mi && t.taskType !== 'workout' })
     const pt = planTasks.filter(t => t.date.startsWith(monthStr))
     const tg = todoGroups.filter(g => g.date.startsWith(monthStr))
     const tgTotal = tg.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
@@ -488,8 +487,8 @@ export default function App() {
     const totalSets = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).length
     const doneSets  = s.flatMap(x=>x.exercises.flatMap(e=>e.completedSets)).filter(Boolean).length
     return {
-      todoAdded: t.length + pt.length + tgTotal,
-      todoDone:  t.filter(x=>x.completed).length + pt.filter(x=>x.completed).length + tgDone,
+      todoAdded: pt.length + tgTotal,
+      todoDone:  pt.filter(x=>x.completed).length + tgDone,
       totalSets, doneSets
     }
   })
@@ -557,9 +556,9 @@ export default function App() {
               statsSearch={statsSearch} setStatsSearch={setStatsSearch}
               todos={todos} workoutSessions={workoutSessions}
               planTasks={planTasks} todoGroups={todoGroups}
-              viewYear={viewYear} setViewYear={setViewYear} viewMonth={viewMonth} setViewMonth={setViewMonth}
-              thisYear={thisYear} isCurrentMonth={isCurrentMonth} prevMonth={prevMonth} nextMonth={nextMonth}
-              todosVM={todosVM} todosVY={todosVY} sessionsVM={sessionsVM} allSetsVM={allSetsVM} doneSetsVM={doneSetsVM}
+              viewYear={viewYear} viewMonth={viewMonth} setViewMonth={setViewMonth}
+              isCurrentMonth={isCurrentMonth} prevMonth={prevMonth} nextMonth={nextMonth}
+              todosVM={todosVM} sessionsVM={sessionsVM} allSetsVM={allSetsVM} doneSetsVM={doneSetsVM}
               monthlyData={monthlyData} maxTodo={maxTodo} maxSets={maxSets}
               rate={rate}
             />

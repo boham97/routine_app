@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MONTHS, dateKey } from '../constants.js'
+import { MONTHS, DAYS, dateKey } from '../constants.js'
 import { sectionLabel } from '../styles.js'
 import { NavCard, NavBtn, EmptyCard, StatCard } from './ui.jsx'
 
@@ -7,65 +7,57 @@ export default function StatsTab({
   statsSearch, setStatsSearch,
   todos, workoutSessions,
   planTasks, todoGroups,
-  viewYear, setViewYear, viewMonth, setViewMonth,
-  thisYear, isCurrentMonth, prevMonth, nextMonth,
-  todosVM, todosVY, sessionsVM, allSetsVM, doneSetsVM,
+  viewYear, viewMonth, setViewMonth,
+  isCurrentMonth, prevMonth, nextMonth,
+  todosVM, sessionsVM, allSetsVM, doneSetsVM,
   monthlyData, maxTodo, maxSets,
   rate,
 }) {
   const [showExDetail,   setShowExDetail]   = useState(false)
   const [showTodoDetail, setShowTodoDetail] = useState(false)
+  const [expandedTodo,   setExpandedTodo]   = useState(null)
 
   // ── 월 필터링 공통 계산 ────────────────────────────────────
-  const monthStr  = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`
-  const ptVM      = (planTasks||[]).filter(t => t.date.startsWith(monthStr))
-  const tgVM      = (todoGroups||[]).filter(g => g.date.startsWith(monthStr))
-  const generalVM = todosVM.filter(t => t.taskType !== 'workout')
+  // 플랜 탭 기반만 집계 (planTasks + todoGroups)
+  // todos(루틴 탭)는 todoGroups 항목과 이름 중복 시 이중 집계되므로 제외
+  const monthStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`
+  const ptVM     = (planTasks||[]).filter(t => t.date.startsWith(monthStr))
+  const tgVM     = (todoGroups||[]).filter(g => g.date.startsWith(monthStr))
 
-  const tgTotal = tgVM.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
-  const tgDone  = tgVM.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
-  const totalTasks = generalVM.length + ptVM.length + tgTotal
-  const doneTasks  = generalVM.filter(t=>t.completed).length + ptVM.filter(t=>t.completed).length + tgDone
+  const tgTotal    = tgVM.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
+  const tgDone     = tgVM.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
+  const totalTasks = ptVM.length + tgTotal
+  const doneTasks  = ptVM.filter(t=>t.completed).length + tgDone
 
   // ── 일반 태스크별 달성률 맵 ────────────────────────────────
   const todoStatMap = {}
-  generalVM.forEach(t => {
-    if (!todoStatMap[t.text]) todoStatMap[t.text] = { text: t.text, total: 0, done: 0 }
-    todoStatMap[t.text].total += 1
-    if (t.completed) todoStatMap[t.text].done += 1
-  })
+  const ensure = (text) => { if (!todoStatMap[text]) todoStatMap[text] = { text, total: 0, done: 0, history: [] } }
   ptVM.forEach(t => {
-    if (!todoStatMap[t.text]) todoStatMap[t.text] = { text: t.text, total: 0, done: 0 }
+    ensure(t.text)
     todoStatMap[t.text].total += 1
     if (t.completed) todoStatMap[t.text].done += 1
+    todoStatMap[t.text].history.push({ date: t.date, done: t.completed ? 1 : 0, total: 1 })
   })
   tgVM.forEach(g => g.items.forEach(item => {
-    if (!todoStatMap[item.text]) todoStatMap[item.text] = { text: item.text, total: 0, done: 0 }
+    ensure(item.text)
     todoStatMap[item.text].total += item.count
     todoStatMap[item.text].done  += item.completedCounts.filter(Boolean).length
+    todoStatMap[item.text].history.push({ date: g.date, done: item.completedCounts.filter(Boolean).length, total: item.count })
   }))
   const todoStatList = Object.values(todoStatMap).sort((a,b) => b.total - a.total)
 
   // ── 종목별 달성률 맵 ───────────────────────────────────────
   const exMap = {}
   sessionsVM.forEach(s => s.exercises.forEach(e => {
-    if (!exMap[e.name]) exMap[e.name] = { name: e.name, color: s.color, totalSets: 0, doneSets: 0, count: 0 }
-    exMap[e.name].totalSets += e.sets
-    exMap[e.name].doneSets  += e.completedSets.filter(Boolean).length
+    if (!exMap[e.name]) exMap[e.name] = { name: e.name, color: s.color, totalSets: 0, doneSets: 0, count: 0, totalReps: 0, plannedReps: 0, unit: e.unit }
+    exMap[e.name].totalSets   += e.sets
+    exMap[e.name].doneSets    += e.completedSets.filter(Boolean).length
     exMap[e.name].count++
+    exMap[e.name].totalReps   += e.completedSets.filter(v => v !== false).reduce((a, v) => a + v, 0)
+    exMap[e.name].plannedReps += e.sets * e.reps
   }))
   const exList = Object.values(exMap)
 
-  // ── 연간 공통 계산 ─────────────────────────────────────────
-  const yearStr   = `${viewYear}-`
-  const ptVY      = (planTasks||[]).filter(t => t.date.startsWith(yearStr))
-  const tgVY      = (todoGroups||[]).filter(g => g.date.startsWith(yearStr))
-  const generalVY = todosVY.filter(t => t.taskType !== 'workout')
-  const tgTotalY  = tgVY.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.count, 0), 0)
-  const tgDoneY   = tgVY.reduce((sum,g) => sum + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
-  const totalY    = generalVY.length + ptVY.length + tgTotalY
-  const doneY     = generalVY.filter(t=>t.completed).length + ptVY.filter(t=>t.completed).length + tgDoneY
-  const workoutDaysY = new Set(workoutSessions.filter(s=>s.date.startsWith(yearStr)).map(s=>s.date)).size
 
   return (
     <div style={{ flex:1, minHeight:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}>
@@ -158,7 +150,7 @@ export default function StatsTab({
         <div>
           <div
             onClick={() => todoStatList.length > 0 && setShowTodoDetail(v => !v)}
-            style={{ ...sectionLabel, color: showTodoDetail ? '#8e8e93' : '#000', cursor: todoStatList.length > 0 ? 'pointer' : 'default', userSelect: 'none', transition: 'color 0.15s' }}
+            style={{ ...sectionLabel, fontSize: '17px', fontWeight: '700', color: showTodoDetail ? '#8e8e93' : '#000', cursor: todoStatList.length > 0 ? 'pointer' : 'default', userSelect: 'none', transition: 'color 0.15s' }}
           >📋 태스크 월간 통계</div>
           <div style={{ background:'#fff', borderRadius:'12px', padding:'16px', display:'flex', gap:'8px' }}>
             <StatCard label="추가"   value={totalTasks}                       color="#007aff"/>
@@ -167,21 +159,45 @@ export default function StatsTab({
           </div>
           {showTodoDetail && (
             <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginTop:'8px' }}>
-              {todoStatList.map((item, i) => (
-                <div key={i} style={{ background:'#fff', borderRadius:'12px', padding:'14px', borderLeft:'4px solid #007aff' }}>
-                  <div style={{ display:'flex', alignItems:'center', marginBottom:'8px' }}>
-                    <span style={{ flex:1, fontSize:'14px', fontWeight:'700' }}>{item.text}</span>
-                    <span style={{ fontSize:'16px', fontWeight:'800', color:'#007aff' }}>{rate(item.done, item.total)}%</span>
+              {todoStatList.map((item, i) => {
+                const isExp = expandedTodo === item.text
+                const history = [...item.history].sort((a,b) => b.date.localeCompare(a.date))
+                return (
+                  <div key={i} onClick={() => setExpandedTodo(isExp ? null : item.text)}
+                    style={{ background:'#fff', borderRadius:'12px', padding:'14px', borderLeft:'4px solid #007aff', cursor:'pointer', userSelect:'none' }}>
+                    <div style={{ display:'flex', alignItems:'center', marginBottom:'8px' }}>
+                      <span style={{ flex:1, fontSize:'14px', fontWeight:'700' }}>{item.text}</span>
+                      <span style={{ fontSize:'16px', fontWeight:'800', color:'#007aff' }}>{rate(item.done, item.total)}%</span>
+                    </div>
+                    <div style={{ height:'3px', background:'#e5e5ea', borderRadius:'2px', marginBottom:'8px' }}>
+                      <div style={{ height:'3px', background:'#007aff', width:`${rate(item.done,item.total)}%`, borderRadius:'2px' }}/>
+                    </div>
+                    <div style={{ display:'flex', gap:'12px', fontSize:'12px', color:'#8e8e93' }}>
+                      <span>총 <b style={{color:'#007aff'}}>{item.total}</b>회</span>
+                      <span>완료 <b style={{color:'#34c759'}}>{item.done}</b>회</span>
+                    </div>
+                    {isExp && (
+                      <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:'0.5px solid #f2f2f7', display:'flex', gap:'5px', flexWrap:'wrap' }}>
+                        {history.map((h, j) => {
+                          const ok      = h.done === h.total
+                          const partial = h.done > 0 && h.done < h.total
+                          const color   = ok ? '#34c759' : partial ? '#ff9500' : '#c6c6c8'
+                          const [,mm,dd] = h.date.split('-')
+                          const dayStr  = DAYS[new Date(h.date + 'T12:00:00').getDay()]
+                          const label   = h.total === 1
+                            ? `${+mm}/${+dd}(${dayStr})`
+                            : `${+mm}/${+dd}(${dayStr}) ${h.done}/${h.total}`
+                          return (
+                            <span key={j} style={{ fontSize:'11px', padding:'3px 8px', borderRadius:'7px', border:`1px solid ${color}`, color, background:`${color}1a`, fontWeight:'500' }}>
+                              {label}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ height:'3px', background:'#e5e5ea', borderRadius:'2px', marginBottom:'8px' }}>
-                    <div style={{ height:'3px', background:'#007aff', width:`${rate(item.done,item.total)}%`, borderRadius:'2px' }}/>
-                  </div>
-                  <div style={{ display:'flex', gap:'12px', fontSize:'12px', color:'#8e8e93' }}>
-                    <span>총 <b style={{color:'#007aff'}}>{item.total}</b>회</span>
-                    <span>완료 <b style={{color:'#34c759'}}>{item.done}</b>회</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -190,7 +206,7 @@ export default function StatsTab({
         <div>
           <div
             onClick={() => exList.length > 0 && setShowExDetail(v => !v)}
-            style={{ ...sectionLabel, color: showExDetail ? '#8e8e93' : '#000', cursor: exList.length > 0 ? 'pointer' : 'default', userSelect: 'none', transition: 'color 0.15s' }}
+            style={{ ...sectionLabel, fontSize: '17px', fontWeight: '700', color: showExDetail ? '#8e8e93' : '#000', cursor: exList.length > 0 ? 'pointer' : 'default', userSelect: 'none', transition: 'color 0.15s' }}
           >🏋️ 운동 월간 통계</div>
           <div style={{ background:'#fff', borderRadius:'12px', padding:'16px', display:'flex', gap:'8px' }}>
             <StatCard label="운동일"   value={sessionsVM.length}  color="#ff9500"/>
@@ -211,27 +227,12 @@ export default function StatsTab({
                   <div style={{ display:'flex', gap:'12px', fontSize:'12px', color:'#8e8e93' }}>
                     <span>{ex.count}회 수행</span>
                     <span>세트 <b style={{color:'#34c759'}}>{ex.doneSets}</b>/{ex.totalSets}</span>
+                    {ex.totalReps > 0 && <span>총 <b style={{color:'#ff9500'}}>{ex.totalReps}</b>{ex.unit}</span>}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* 연간 통계 */}
-        <div>
-          <div style={{ ...sectionLabel, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span>연간 통계 ({viewYear}년)</span>
-            <div style={{ display:'flex', gap:'4px' }}>
-              <NavBtn small onClick={()=>setViewYear(y=>y-1)}>‹</NavBtn>
-              <NavBtn small onClick={()=>setViewYear(y=>y+1)} disabled={viewYear>=thisYear}>›</NavBtn>
-            </div>
-          </div>
-          <div style={{ background:'#fff', borderRadius:'12px', padding:'16px', display:'flex', gap:'8px' }}>
-            <StatCard label="태스크추가" value={totalY}        color="#007aff"/>
-            <StatCard label="태스크완료" value={doneY}         color="#34c759"/>
-            <StatCard label="운동일수"   value={workoutDaysY}  color="#ff9500"/>
-          </div>
         </div>
 
         {/* 월별 막대 그래프 */}
