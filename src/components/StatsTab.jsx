@@ -18,7 +18,7 @@ export default function StatsTab({
         {/* 검색창 */}
         <div style={{ display:'flex', alignItems:'center', background:'#fff', borderRadius:'12px', padding:'8px 12px', gap:'8px' }}>
           <span style={{ fontSize:'16px' }}>🔍</span>
-          <input value={statsSearch} onChange={e=>setStatsSearch(e.target.value)} placeholder="운동/할일 검색..." style={{ flex:1, border:'none', background:'transparent', fontSize:'15px', outline:'none' }} />
+          <input value={statsSearch} onChange={e=>setStatsSearch(e.target.value)} placeholder="운동/태스크 검색..." style={{ flex:1, border:'none', background:'transparent', fontSize:'15px', outline:'none' }} />
           {statsSearch && <button onClick={()=>setStatsSearch('')} style={{ background:'none', border:'none', color:'#8e8e93', fontSize:'16px', cursor:'pointer' }}>✕</button>}
         </div>
 
@@ -58,7 +58,7 @@ export default function StatsTab({
                       <div style={{ display:'flex', alignItems:'flex-start', marginBottom:'8px' }}>
                         <div style={{ flex:1 }}>
                           <div style={{ fontSize:'14px', fontWeight:'700' }}>{r.text}</div>
-                          <div style={{ fontSize:'11px', color, marginTop:'2px' }}>{isTodo?'할일':'운동'}</div>
+                          <div style={{ fontSize:'11px', color, marginTop:'2px' }}>{isTodo?'태스크':'운동'}</div>
                         </div>
                         <span style={{ fontSize:'16px', fontWeight:'800', color }}>{rate(done,total)}%</span>
                       </div>
@@ -100,7 +100,7 @@ export default function StatsTab({
 
         {/* 월간 통계 */}
         <div>
-          <div style={sectionLabel}>📋 할일 월간 통계</div>
+          <div style={sectionLabel}>📋 태스크 월간 통계</div>
           <div style={{ background:'#fff', borderRadius:'12px', padding:'16px', display:'flex', gap:'8px' }}>
             <StatCard label="추가"   value={todosVM.length}                       color="#007aff"/>
             <StatCard label="완료"   value={todosVM.filter(t=>t.completed).length} color="#34c759"/>
@@ -159,8 +159,8 @@ export default function StatsTab({
             </div>
           </div>
           <div style={{ background:'#fff', borderRadius:'12px', padding:'16px', display:'flex', gap:'8px' }}>
-            <StatCard label="할일추가" value={todosVY.length}                        color="#007aff"/>
-            <StatCard label="할일완료" value={todosVY.filter(t=>t.completed).length}  color="#34c759"/>
+            <StatCard label="태스크추가" value={todosVY.length}                        color="#007aff"/>
+            <StatCard label="태스크완료" value={todosVY.filter(t=>t.completed).length}  color="#34c759"/>
             <StatCard label="운동일수" value={new Set(workoutSessions.filter(s=>new Date(s.date).getFullYear()===viewYear).map(s=>s.date)).size} color="#ff9500"/>
           </div>
         </div>
@@ -191,7 +191,7 @@ export default function StatsTab({
               })}
             </div>
             <div style={{ display:'flex', gap:'8px', justifyContent:'center', marginTop:'12px', flexWrap:'wrap' }}>
-              {[['#d1e4ff','할일'],['#34c759','할일완료'],['#ffe5b4','운동세트'],['#ff9500','운동완료']].map(([c,l])=>(
+              {[['#d1e4ff','태스크'],['#34c759','태스크완료'],['#ffe5b4','운동세트'],['#ff9500','운동완료']].map(([c,l])=>(
                 <div key={l} style={{ display:'flex', alignItems:'center', gap:'4px' }}>
                   <div style={{ width:'10px', height:'10px', background:c, borderRadius:'2px' }}/>
                   <span style={{ fontSize:'11px', color:'#8e8e93' }}>{l}</span>

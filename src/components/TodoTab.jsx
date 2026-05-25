@@ -1,16 +1,12 @@
 import { MONTHS, DAYS, addDays } from '../constants.js'
-import { card, row, circle, delBtn, inputStyle, confirmBtn } from '../styles.js'
-import { NavCard, NavBtn, EmptyCard, AddRowBtn } from './ui.jsx'
+import { NavCard, NavBtn, EmptyCard } from './ui.jsx'
+import { card, row, circle } from '../styles.js'
 
 export default function TodoTab({
   selectedDate, setSelectedDate,
   labelForDate,
   sessionsForDay, expandedSession, setExpandedSession, toggleSet, exTimer,
   groupsForDay, expandedTodoGroup, setExpandedTodoGroup, toggleGroupItemCount, removeTodoGroup,
-  todosForDay, toggleTodo, deleteTodo,
-  showTodoInput, setShowTodoInput, todoInput, setTodoInput, addTodo,
-  showWorkoutPanel, setShowWorkoutPanel, workoutTemplates, availableTemplates, applyWorkoutTemplate,
-  showTodoGroupPanel, setShowTodoGroupPanel, todoTemplates, availableTodoTemplates, applyTodoTemplate,
   removeSession,
   confirm, rate,
 }) {
@@ -150,94 +146,10 @@ export default function TodoTab({
           )
         })}
 
-        {/* 개별 할일 */}
-        {todosForDay.length > 0 && (
-          <div style={card}>
-            {todosForDay.map((todo, i) => (
-              <div key={todo.id} style={{ ...row, borderTop: i===0?'none':'0.5px solid #e5e5ea' }}>
-                <div onClick={()=>toggleTodo(todo.id)} style={{ ...circle, background: todo.completed?'#34c759':'transparent', border: todo.completed?'none':'2px solid #c6c6c8', cursor:'pointer' }}>
-                  {todo.completed && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                </div>
-                <span onClick={()=>toggleTodo(todo.id)} style={{ flex:1, fontSize:'15px', color: todo.completed?'#8e8e93':'#000', textDecoration: todo.completed?'line-through':'none', cursor:'pointer' }}>{todo.text}</span>
-                <button onClick={()=>confirm(`"${todo.text}" 할일을 삭제할까요?`, ()=>deleteTodo(todo.id))} style={delBtn}>−</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {todosForDay.length===0 && groupsForDay.length===0 && sessionsForDay.length===0 && !showTodoInput && !showTodoGroupPanel && !showWorkoutPanel &&
-          <EmptyCard>오늘의 할일이 없습니다</EmptyCard>}
-
-        {/* 개별 할일 입력 */}
-        {showTodoInput && (
-          <div style={{ ...card, flexDirection:'row', gap:'8px', alignItems:'center', padding:'12px' }}>
-            <input autoFocus value={todoInput} onChange={e=>setTodoInput(e.target.value)}
-              onKeyDown={e=>{ if(e.key==='Enter') addTodo(); if(e.key==='Escape') setShowTodoInput(false) }}
-              placeholder="할 일 입력..." style={inputStyle} />
-            <button onClick={addTodo} style={confirmBtn}>추가</button>
-          </div>
-        )}
-
-        {/* 운동 루틴 선택 패널 */}
-        {showWorkoutPanel && (
-          <div style={{ ...card, padding:'16px', display:'flex', flexDirection:'column', gap:'10px' }}>
-            <div style={{ fontSize:'13px', fontWeight:'600', color:'#8e8e93' }}>운동 루틴 선택</div>
-            {workoutTemplates.length === 0 ? (
-              <div style={{ color:'#8e8e93', fontSize:'14px', textAlign:'center', padding:'8px 0' }}>
-                루틴 탭에서 운동 루틴을 먼저 만들어주세요
-              </div>
-            ) : availableTemplates.length === 0 ? (
-              <div style={{ color:'#8e8e93', fontSize:'14px', textAlign:'center', padding:'8px 0' }}>오늘 모든 루틴이 추가되었습니다</div>
-            ) : (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
-                {availableTemplates.map(tpl => (
-                  <button key={tpl.id} onClick={()=>applyWorkoutTemplate(tpl)} style={{ display:'flex', alignItems:'center', gap:'4px', borderRadius:'14px', border:`1px solid ${tpl.color}`, background:'transparent', padding:'5px 10px', cursor:'pointer' }}>
-                    <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:tpl.color }}/>
-                    <span style={{ color:tpl.color, fontWeight:'600', fontSize:'13px' }}>{tpl.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 할일 그룹 선택 패널 */}
-        {showTodoGroupPanel && (
-          <div style={{ ...card, padding:'16px', display:'flex', flexDirection:'column', gap:'10px' }}>
-            <div style={{ fontSize:'13px', fontWeight:'600', color:'#8e8e93' }}>할일 그룹 선택</div>
-            {todoTemplates.length === 0 ? (
-              <div style={{ color:'#8e8e93', fontSize:'14px', textAlign:'center', padding:'8px 0' }}>
-                루틴 탭에서 할일 그룹을 먼저 만들어주세요
-              </div>
-            ) : availableTodoTemplates.length === 0 ? (
-              <div style={{ color:'#8e8e93', fontSize:'14px', textAlign:'center', padding:'8px 0' }}>오늘 모든 그룹이 추가되었습니다</div>
-            ) : (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
-                {availableTodoTemplates.map(tpl => (
-                  <button key={tpl.id} onClick={()=>applyTodoTemplate(tpl)} style={{ display:'flex', alignItems:'center', gap:'4px', borderRadius:'14px', border:`1px solid ${tpl.color}`, background:'transparent', padding:'5px 10px', cursor:'pointer' }}>
-                    <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:tpl.color }}/>
-                    <span style={{ color:tpl.color, fontWeight:'600', fontSize:'13px' }}>{tpl.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {groupsForDay.length===0 && sessionsForDay.length===0 &&
+          <EmptyCard>오늘의 플랜이 없습니다</EmptyCard>}
 
       </div>
-    </div>
-
-    {/* 하단 추가 버튼 3종 - 고정 */}
-    <div style={{ padding:'8px 16px 10px', display:'flex', gap:'8px', background:'#f2f2f7', borderTop:'0.5px solid #e5e5ea' }}>
-      <AddRowBtn active={showWorkoutPanel} onClick={()=>{ setShowWorkoutPanel(v=>!v); setShowTodoGroupPanel(false); setShowTodoInput(false) }} style={{ flex:1 }}>
-        {showWorkoutPanel ? '✕' : '+ 운동'}
-      </AddRowBtn>
-      <AddRowBtn active={showTodoGroupPanel} onClick={()=>{ setShowTodoGroupPanel(v=>!v); setShowWorkoutPanel(false); setShowTodoInput(false) }} style={{ flex:1 }}>
-        {showTodoGroupPanel ? '✕' : '+ 그룹'}
-      </AddRowBtn>
-      <AddRowBtn active={showTodoInput} onClick={()=>{ setShowTodoInput(v=>!v); setShowWorkoutPanel(false); setShowTodoGroupPanel(false) }} style={{ flex:1 }}>
-        {showTodoInput ? '✕' : '+ 할일'}
-      </AddRowBtn>
     </div>
   </>
 }

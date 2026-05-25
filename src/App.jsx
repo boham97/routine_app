@@ -7,6 +7,35 @@ import { DrumWheelModal, ConfirmModal } from './components/Modals.jsx'
 
 export default function App() {
   const [tab, setTab] = useState('todo')
+  const TABS = ['todo', 'routine', 'stats']
+  const tabSwipeTx = useRef(null)
+  const tabSwipeTy = useRef(null)
+  const tabSwipeIsH = useRef(false)
+
+  function onTabSwipeStart(e) {
+    tabSwipeTx.current = e.touches[0].clientX
+    tabSwipeTy.current = e.touches[0].clientY
+    tabSwipeIsH.current = false
+  }
+  function onTabSwipeMove(e) {
+    if (tabSwipeTx.current === null) return
+    const dx = e.touches[0].clientX - tabSwipeTx.current
+    const dy = e.touches[0].clientY - tabSwipeTy.current
+    if (!tabSwipeIsH.current && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+    if (!tabSwipeIsH.current) tabSwipeIsH.current = Math.abs(dx) > Math.abs(dy)
+  }
+  function onTabSwipeEnd(e) {
+    if (!tabSwipeIsH.current) return
+    const dx = e.changedTouches[0].clientX - (tabSwipeTx.current ?? 0)
+    tabSwipeTx.current = null
+    if (Math.abs(dx) < 60) return
+    setTab(prev => {
+      const i = TABS.indexOf(prev)
+      if (dx < 0 && i < TABS.length - 1) return TABS[i + 1]
+      if (dx > 0 && i > 0) return TABS[i - 1]
+      return prev
+    })
+  }
 
   // ── 공통 날짜 ──────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(getToday())
@@ -20,13 +49,11 @@ export default function App() {
   const [todoTemplates,       setTodoTemplates]       = useState(() => load('todoTemplates', []))
   const [todoGroups,          setTodoGroups]          = useState(() => load('todoGroups', []))
   const [expandedTodoGroup,   setExpandedTodoGroup]   = useState({})
-  const [showTodoGroupPanel,  setShowTodoGroupPanel]  = useState(false)
 
   // ── 운동 루틴 ──────────────────────────────────────────────
   const [workoutTemplates, setWorkoutTemplates] = useState(() => load('workoutTemplates', []))
   const [workoutSessions,  setWorkoutSessions]  = useState(() => load('workoutSessions',  []))
   const [expandedSession,  setExpandedSession]  = useState({})
-  const [showWorkoutPanel, setShowWorkoutPanel] = useState(false)
 
   // ── 루틴 탭 상태 ───────────────────────────────────────────
   const [routineTab,        setRoutineTab]        = useState('workout')
@@ -115,18 +142,50 @@ export default function App() {
     return null
   }
 
-  // ── 개별 할일 CRUD ─────────────────────────────────────────
-  function addTodo() {
-    const text = todoInput.trim(); if (!text) return
-    const createdAt = new Date(selectedDate); createdAt.setHours(12,0,0,0)
-    setTodos(p => [...p, { id: Date.now(), text, completed: false, createdAt: createdAt.toISOString() }])
-    setTodoInput(''); setShowTodoInput(false)
+  // ── 태스크 CRUD ────────────────────────────────────────────
+  function addTask({ name, taskType, goalMode, sets, reps, seconds, desc }) {
+    const createdAt = getToday(); createdAt.setHours(12,0,0,0)
+    const base = { id: Date.now(), text: name, completed: false, createdAt: createdAt.toISOString(), taskType, ...(desc ? { desc } : {}) }
+    if (taskType === 'workout') {
+      base.goalMode = goalMode
+      if (goalMode === 'reps') {
+        const s = Math.max(1, parseInt(sets) || 3)
+        base.sets = s; base.reps = parseInt(reps) || 10
+        base.completedSets = Array(s).fill(false)
+      } else {
+        const s = Math.max(1, parseInt(sets) || 3)
+        base.sets = s; base.seconds = parseInt(seconds) || 60
+        base.completedSets = Array(s).fill(false)
+      }
+    }
+    setTodos(p => [...p, base])
+  }
+  function toggleTaskSet(taskId, setIdx) {
+    setTodos(p => p.map(t => {
+      if (t.id !== taskId) return t
+      const newSets = (t.completedSets || []).map((v, i) => i === setIdx ? !v : v)
+      return { ...t, completedSets: newSets, completed: newSets.every(Boolean) }
+    }))
   }
   function toggleTodo(id) {
     setTodos(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
   }
   function deleteTodo(id) { setTodos(p => p.filter(t => t.id !== id)) }
-  const todosForDay = todos.filter(t => dateKey(t.createdAt) === selKey)
+  function updateTask(id, changes) {
+    setTodos(p => p.map(t => {
+      if (t.id !== id) return t
+      const updated = { ...t, ...changes }
+      if ('sets' in changes && t.taskType === 'workout') {
+        const newSets = Math.max(1, parseInt(changes.sets) || 1)
+        updated.sets = newSets
+        const old = t.completedSets || []
+        updated.completedSets = Array(newSets).fill(false).map((_, i) => old[i] ?? false)
+      }
+      return updated
+    }))
+  }
+  const todosForDay    = todos.filter(t => dateKey(t.createdAt) === selKey)
+  const tasksForToday  = todos.filter(t => dateKey(t.createdAt) === todayKey)
 
   // ── 할일 그룹 CRUD ─────────────────────────────────────────
   function applyTodoTemplate(tpl) {
@@ -137,7 +196,6 @@ export default function App() {
     }
     setTodoGroups(p => [...p, group])
     setExpandedTodoGroup(p => ({ ...p, [group.id]: true }))
-    setShowTodoGroupPanel(false)
   }
   function removeTodoGroup(id) { setTodoGroups(p => p.filter(g => g.id !== id)) }
   function toggleGroupItemCount(groupId, itemId, idx) {
@@ -167,7 +225,6 @@ export default function App() {
     }
     setWorkoutSessions(p => [...p, session])
     setExpandedSession(p => ({ ...p, [session.id]: true }))
-    setShowWorkoutPanel(false)
   }
   function removeSession(id) {
     if (exTimer?.sessionId === id) { clearInterval(exTimerIntervalRef.current); setExTimer(null) }
@@ -356,13 +413,18 @@ export default function App() {
 
       {/* 휴식 타이머 */}
       {restSec !== null && (
-        <div style={{ background: restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flexShrink:0 }}>
+        <div style={{ background: restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flex:'0 0 auto' }}>
           휴식 {restSec}초 남음
         </div>
       )}
 
       {/* Content */}
-      <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
+      <div
+        onTouchStart={onTabSwipeStart}
+        onTouchMove={onTabSwipeMove}
+        onTouchEnd={onTabSwipeEnd}
+        style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}
+      >
 
         {tab==='todo' && (
           <TodoTab
@@ -371,13 +433,6 @@ export default function App() {
             sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} exTimer={exTimer}
             groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
             toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
-            todosForDay={todosForDay} toggleTodo={toggleTodo} deleteTodo={deleteTodo}
-            showTodoInput={showTodoInput} setShowTodoInput={setShowTodoInput}
-            todoInput={todoInput} setTodoInput={setTodoInput} addTodo={addTodo}
-            showWorkoutPanel={showWorkoutPanel} setShowWorkoutPanel={setShowWorkoutPanel}
-            workoutTemplates={workoutTemplates} availableTemplates={availableTemplates} applyWorkoutTemplate={applyWorkoutTemplate}
-            showTodoGroupPanel={showTodoGroupPanel} setShowTodoGroupPanel={setShowTodoGroupPanel}
-            todoTemplates={todoTemplates} availableTodoTemplates={availableTodoTemplates} applyTodoTemplate={applyTodoTemplate}
             removeSession={removeSession}
             confirm={confirm} rate={rate}
           />
@@ -385,25 +440,9 @@ export default function App() {
 
         {tab==='routine' && (
           <RoutineTab
-            routineTab={routineTab} setRoutineTab={setRoutineTab}
-            workoutTemplates={workoutTemplates}
-            showWorkoutForm={showWorkoutForm} setShowWorkoutForm={setShowWorkoutForm}
-            editingWorkoutId={editingWorkoutId}
-            wName={wName} setWName={setWName} wColor={wColor} setWColor={setWColor} wExercises={wExercises}
-            exInput={exInput} setExInput={setExInput} exSets={exSets} setExSets={setExSets}
-            exReps={exReps} setExReps={setExReps} exUnit={exUnit} setExUnit={setExUnit}
-            exInputRef={exInputRef} addExercise={addExercise} removeExercise={removeExercise}
-            saveWorkoutTpl={saveWorkoutTpl} deleteWorkoutTpl={deleteWorkoutTpl}
-            openAddWorkout={openAddWorkout} openEditWorkout={openEditWorkout}
-            todoTemplates={todoTemplates}
-            showTodoTplForm={showTodoTplForm} setShowTodoTplForm={setShowTodoTplForm}
-            editingTodoTplId={editingTodoTplId}
-            ttName={ttName} setTtName={setTtName} ttColor={ttColor} setTtColor={setTtColor} ttItems={ttItems}
-            ttInput={ttInput} setTtInput={setTtInput} ttCount={ttCount} setTtCount={setTtCount}
-            ttInputRef={ttInputRef} addTtItem={addTtItem} removeTtItem={removeTtItem}
-            saveTodoTpl={saveTodoTpl} deleteTodoTpl={deleteTodoTpl}
-            openAddTodoTpl={openAddTodoTpl} openEditTodoTpl={openEditTodoTpl}
-            confirm={confirm}
+            addTask={addTask} tasks={tasksForToday}
+            toggleTaskSet={toggleTaskSet}
+            deleteTodo={deleteTodo} updateTask={updateTask} confirm={confirm} rate={rate}
           />
         )}
 
@@ -436,7 +475,7 @@ export default function App() {
       {/* Tab Bar */}
       <div style={{ height:'56px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
         {[
-          { key:'todo',    label:'할 일', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
+          { key:'todo',    label:'플랜', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
           { key:'routine', label:'루틴',  icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="19" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="5" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="17" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="7" y="10" width="10" height="4" rx="2" fill="currentColor"/></svg> },
           { key:'stats',   label:'통계',  icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="4" height="7" rx="1" fill="currentColor"/><rect x="10" y="9" width="4" height="11" rx="1" fill="currentColor"/><rect x="16" y="5" width="4" height="15" rx="1" fill="currentColor"/></svg> },
         ].map(t => (
