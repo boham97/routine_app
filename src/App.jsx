@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { PALETTE, dateKey, addDays, getToday, load } from './constants.js'
+import { dateKey, addDays, getToday, load } from './constants.js'
 import TodoTab from './components/TodoTab.jsx'
 import RoutineTab from './components/RoutineTab.jsx'
 import StatsTab from './components/StatsTab.jsx'
@@ -8,44 +8,8 @@ import { DrumWheelModal, ConfirmModal } from './components/Modals.jsx'
 export default function App() {
   const TABS = ['todo', 'routine', 'stats']
   const [tabIdx,   setTabIdx]   = useState(0)
-  const [swipeDx,  setSwipeDx]  = useState(0)
   const tab = TABS[tabIdx]
-  function setTab(key) { setTabIdx(TABS.indexOf(key)); setSwipeDx(0) }
-
-  const tabSwipeTx    = useRef(null)
-  const tabSwipeTy    = useRef(null)
-  const tabSwipeIsH   = useRef(false)
-
-  function onTabSwipeStart(e) {
-    tabSwipeTx.current  = e.touches[0].clientX
-    tabSwipeTy.current  = e.touches[0].clientY
-    tabSwipeIsH.current = false
-  }
-  function onTabSwipeMove(e) {
-    if (tabSwipeTx.current === null) return
-    const dx = e.touches[0].clientX - tabSwipeTx.current
-    const dy = e.touches[0].clientY - tabSwipeTy.current
-    if (!tabSwipeIsH.current && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
-    if (!tabSwipeIsH.current) tabSwipeIsH.current = Math.abs(dx) > Math.abs(dy)
-    if (!tabSwipeIsH.current) return
-    // 첫/마지막 탭에서 더 이상 못 넘어가도록 클램프
-    const clamped = tabIdx === 0 ? Math.min(0, dx)
-                  : tabIdx === TABS.length - 1 ? Math.max(0, dx)
-                  : dx
-    setSwipeDx(clamped)
-  }
-  function onTabSwipeEnd(e) {
-    if (!tabSwipeIsH.current) return
-    const dx = e.changedTouches[0].clientX - (tabSwipeTx.current ?? 0)
-    tabSwipeTx.current = null
-    setSwipeDx(0)   // transition으로 snap
-    if (Math.abs(dx) < 60) return
-    setTabIdx(prev => {
-      if (dx < 0 && prev < TABS.length - 1) return prev + 1
-      if (dx > 0 && prev > 0) return prev - 1
-      return prev
-    })
-  }
+  function setTab(key) { setTabIdx(TABS.indexOf(key)) }
 
   // ── 공통 날짜 ──────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(getToday())
@@ -70,7 +34,6 @@ export default function App() {
   const [showWorkoutForm,   setShowWorkoutForm]   = useState(false)
   const [editingWorkoutId,  setEditingWorkoutId]  = useState(null)
   const [wName,  setWName]  = useState('')
-  const [wColor, setWColor] = useState(PALETTE[0])
   const [wExercises, setWExercises] = useState([])
   const [exInput, setExInput] = useState('')
   const [exSets,  setExSets]  = useState('3')
@@ -81,7 +44,6 @@ export default function App() {
   const [showTodoTplForm,  setShowTodoTplForm]  = useState(false)
   const [editingTodoTplId, setEditingTodoTplId] = useState(null)
   const [ttName,  setTtName]  = useState('')
-  const [ttColor, setTtColor] = useState(PALETTE[1])
   const [ttItems, setTtItems] = useState([])
   const [ttInput, setTtInput] = useState('')
   const [ttCount, setTtCount] = useState('1')
@@ -216,7 +178,7 @@ export default function App() {
     if (scope === 'today') {
       if (todoGroups.find(g => g.templateId === tpl.id && g.date === selKey)) return
       const group = {
-        id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
+        id: Date.now(), templateId: tpl.id, name: tpl.name, date: selKey,
         items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) }))
       }
       setTodoGroups(p => [...p, group])
@@ -228,7 +190,7 @@ export default function App() {
       for (let i = 0; i < 7; i++) {
         const dKey = dateKey(addDays(monday, i))
         if (!todoGroups.find(g => g.templateId === tpl.id && g.date === dKey)) {
-          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, color: tpl.color, date: dKey, isWeekly: true,
+          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, date: dKey, isWeekly: true,
             items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) })) })
         }
       }
@@ -263,7 +225,7 @@ export default function App() {
     if (scope === 'today') {
       if (workoutSessions.find(s => s.templateId === tpl.id && s.date === selKey)) return
       const session = {
-        id: Date.now(), templateId: tpl.id, name: tpl.name, color: tpl.color, date: selKey,
+        id: Date.now(), templateId: tpl.id, name: tpl.name, date: selKey,
         exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) }))
       }
       setWorkoutSessions(p => [...p, session])
@@ -275,7 +237,7 @@ export default function App() {
       for (let i = 0; i < 7; i++) {
         const dKey = dateKey(addDays(monday, i))
         if (!workoutSessions.find(s => s.templateId === tpl.id && s.date === dKey)) {
-          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, color: tpl.color, date: dKey, isWeekly: true,
+          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, date: dKey, isWeekly: true,
             exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) })) })
         }
       }
@@ -377,12 +339,12 @@ export default function App() {
 
   // ── 운동 루틴 템플릿 CRUD ──────────────────────────────────
   function openAddWorkout() {
-    setEditingWorkoutId(null); setWName(''); setWColor(PALETTE[0]); setWExercises([])
+    setEditingWorkoutId(null); setWName(''); setWExercises([])
     setExInput(''); setExSets('3'); setExReps('10'); setExUnit('회')
     setShowWorkoutForm(true)
   }
   function openEditWorkout(tpl) {
-    setEditingWorkoutId(tpl.id); setWName(tpl.name); setWColor(tpl.color); setWExercises([...tpl.exercises])
+    setEditingWorkoutId(tpl.id); setWName(tpl.name); setWExercises([...tpl.exercises])
     setExInput(''); setExSets('3'); setExReps('10'); setExUnit('회')
     setShowWorkoutForm(true)
   }
@@ -397,9 +359,9 @@ export default function App() {
     if (!wName.trim() || wExercises.length === 0) return
     if (editingWorkoutId) {
       setWorkoutTemplates(p => p.map(t => t.id === editingWorkoutId
-        ? { ...t, name: wName.trim(), color: wColor, exercises: [...wExercises] } : t))
+        ? { ...t, name: wName.trim(), exercises: [...wExercises] } : t))
     } else {
-      setWorkoutTemplates(p => [...p, { id: Date.now(), name: wName.trim(), color: wColor, exercises: [...wExercises] }])
+      setWorkoutTemplates(p => [...p, { id: Date.now(), name: wName.trim(), exercises: [...wExercises] }])
     }
     setShowWorkoutForm(false); setEditingWorkoutId(null)
   }
@@ -410,11 +372,11 @@ export default function App() {
 
   // ── 할일 그룹 템플릿 CRUD ──────────────────────────────────
   function openAddTodoTpl() {
-    setEditingTodoTplId(null); setTtName(''); setTtColor(PALETTE[1]); setTtItems([])
+    setEditingTodoTplId(null); setTtName(''); setTtItems([])
     setTtInput(''); setTtCount('1'); setShowTodoTplForm(true)
   }
   function openEditTodoTpl(tpl) {
-    setEditingTodoTplId(tpl.id); setTtName(tpl.name); setTtColor(tpl.color); setTtItems([...tpl.items])
+    setEditingTodoTplId(tpl.id); setTtName(tpl.name); setTtItems([...tpl.items])
     setTtInput(''); setTtCount('1'); setShowTodoTplForm(true)
   }
   function addTtItem() {
@@ -428,11 +390,11 @@ export default function App() {
     if (!ttName.trim() || ttItems.length === 0) return
     if (editingTodoTplId) {
       setTodoTemplates(p => p.map(t => t.id === editingTodoTplId
-        ? { ...t, name: ttName.trim(), color: ttColor, items: [...ttItems] } : t))
+        ? { ...t, name: ttName.trim(), items: [...ttItems] } : t))
       setTodoGroups(p => p.map(g => g.templateId === editingTodoTplId
-        ? { ...g, name: ttName.trim(), color: ttColor } : g))
+        ? { ...g, name: ttName.trim() } : g))
     } else {
-      setTodoTemplates(p => [...p, { id: Date.now(), name: ttName.trim(), color: ttColor, items: [...ttItems] }])
+      setTodoTemplates(p => [...p, { id: Date.now(), name: ttName.trim(), items: [...ttItems] }])
     }
     setShowTodoTplForm(false); setEditingTodoTplId(null)
   }
@@ -442,14 +404,14 @@ export default function App() {
   }
 
   // ── 그룹 간편 추가 (RoutineTab용) ─────────────────────────
-  function addWorkoutGroup(name, color, exercises) {
-    setWorkoutTemplates(p => [...p, { id: Date.now(), name: name.trim(), color, exercises }])
+  function addWorkoutGroup(name, exercises) {
+    setWorkoutTemplates(p => [...p, { id: Date.now(), name: name.trim(), exercises }])
   }
   function updateWorkoutGroup(id, changes) {
     setWorkoutTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
   }
-  function addGeneralGroup(name, color, items) {
-    setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), color, items }])
+  function addGeneralGroup(name, items) {
+    setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), items }])
   }
   function updateGeneralGroup(id, changes) {
     setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
@@ -474,18 +436,13 @@ export default function App() {
       )}
 
       {/* Content — 슬라이딩 탭 컨테이너 */}
-      <div
-        onTouchStart={onTabSwipeStart}
-        onTouchMove={onTabSwipeMove}
-        onTouchEnd={onTabSwipeEnd}
-        style={{ flex:1, minHeight:0, overflow:'hidden', position:'relative' }}
-      >
+      <div style={{ flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
         <div style={{
           display: 'flex',
           width: '300%',
           height: '100%',
-          transform: `translateX(calc(${-tabIdx * (100/3)}% + ${swipeDx}px))`,
-          transition: swipeDx !== 0 ? 'none' : 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          transform: `translateX(${-tabIdx * (100/3)}%)`,
+          transition: 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           willChange: 'transform',
         }}>
 
@@ -510,7 +467,7 @@ export default function App() {
           {/* 루틴 탭 */}
           <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <RoutineTab
-              addTask={addTask} tasks={tasksForToday}
+              addTask={addTask} tasks={todos}
               toggleTaskSet={toggleTaskSet}
               deleteTodo={deleteTodo} updateTask={updateTask} confirm={confirm} rate={rate}
               workoutTemplates={workoutTemplates} addWorkoutGroup={addWorkoutGroup} updateWorkoutGroup={updateWorkoutGroup} deleteWorkoutTpl={deleteWorkoutTpl}

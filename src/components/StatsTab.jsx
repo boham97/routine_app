@@ -34,15 +34,42 @@ export default function StatsTab({
   const panelTx = useRef(null)
   const panelTy = useRef(null)
   function onPanelTouchStart(e) {
+    e.stopPropagation()
     panelTx.current = e.touches[0].clientX
     panelTy.current = e.touches[0].clientY
   }
   function onPanelTouchEnd(e) {
+    e.stopPropagation()
     if (panelTx.current === null) return
     const dx = e.changedTouches[0].clientX - panelTx.current
     const dy = e.changedTouches[0].clientY - panelTy.current
     panelTx.current = null
     if (dx > 60 && Math.abs(dy) < Math.abs(dx)) closeDetail()
+  }
+
+  // ── 좌우 스와이프로 주차 이동 ─────────────────────────────
+  const swTx  = useRef(null)
+  const swTy  = useRef(null)
+  const swIsH = useRef(false)
+  function onSwipeStart(e) {
+    swTx.current = e.touches[0].clientX
+    swTy.current = e.touches[0].clientY
+    swIsH.current = false
+  }
+  function onSwipeMove(e) {
+    if (swTx.current === null) return
+    const dx = e.touches[0].clientX - swTx.current
+    const dy = e.touches[0].clientY - swTy.current
+    if (!swIsH.current && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+    if (!swIsH.current) swIsH.current = Math.abs(dx) > Math.abs(dy)
+  }
+  function onSwipeEnd(e) {
+    if (swTx.current === null) return
+    const dx = e.changedTouches[0].clientX - swTx.current
+    const isH = swIsH.current
+    swTx.current = null; swIsH.current = false
+    if (!isH || Math.abs(dx) < 60) return
+    setViewWeekOffset(v => v + (dx > 0 ? -1 : 1))
   }
 
   function openDetail(type, period) {
@@ -194,7 +221,12 @@ export default function StatsTab({
   }
 
   return (
-    <div style={{ flex:1, minHeight:0, position:'relative', overflow:'hidden' }}>
+    <div
+      onTouchStart={onSwipeStart}
+      onTouchMove={onSwipeMove}
+      onTouchEnd={onSwipeEnd}
+      style={{ flex:1, minHeight:0, position:'relative', overflow:'hidden' }}
+    >
 
       {/* ── 메인 스크롤 뷰 ── */}
       <div style={{ position:'absolute', inset:0, overflowY:'scroll', WebkitOverflowScrolling:'touch', padding:'0 16px 16px' }}>

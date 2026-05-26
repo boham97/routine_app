@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { PALETTE } from '../constants.js'
 
 const SEG = (active, color = '#007aff') => ({
   flex: 1, padding: '7px', border: 'none', borderRadius: '7px', fontSize: '14px',
@@ -50,20 +49,6 @@ function Stepper({ label, value, onChange, color = '#007aff' }) {
         <button onClick={() => onChange(value + 1)} style={{ width: '34px', height: '34px', border: 'none', background: '#ebebeb', borderRadius: '0 8px 8px 0', fontSize: '20px', cursor: 'pointer', color, fontWeight: '700', lineHeight: 1 }}>+</button>
       </div>
       <span style={{ fontSize: '11px', color: '#8e8e93' }}>{label}</span>
-    </div>
-  )
-}
-
-function ColorPicker({ value, onChange }) {
-  return (
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-      {PALETTE.map(c => (
-        <div key={c} onClick={() => onChange(c)} style={{
-          width: '28px', height: '28px', borderRadius: '50%', background: c, cursor: 'pointer',
-          border: value === c ? '3px solid #000' : '3px solid transparent',
-          boxSizing: 'border-box', flexShrink: 0,
-        }}/>
-      ))}
     </div>
   )
 }
@@ -153,7 +138,6 @@ export default function RoutineTab({
   const ggPanel       = useSlidePanel()
   const [ggTarget,       setGgTarget]       = useState(null)
   const [ggdName,        setGgdName]        = useState('')
-  const [ggdColor,       setGgdColor]       = useState(PALETTE[1])
   const [ggdSelectedIds, setGgdSelectedIds] = useState([])
 
   // ── 태스크 디테일 패널 ──
@@ -168,7 +152,6 @@ export default function RoutineTab({
   const wgPanel      = useSlidePanel()
   const [wgTarget,      setWgTarget]      = useState(null)   // null = 새 그룹, or template
   const [wgdName,       setWgdName]       = useState('')
-  const [wgdColor,      setWgdColor]      = useState(PALETTE[0])
   const [wgdSelectedIds, setWgdSelectedIds] = useState([])
 
   const canAdd = name.trim().length > 0
@@ -200,7 +183,6 @@ export default function RoutineTab({
   function openWgDetail(tpl) {
     setWgTarget(tpl ?? null)
     setWgdName(tpl ? tpl.name : '')
-    setWgdColor(tpl ? tpl.color : PALETTE[0])
     setWgdSelectedIds(tpl ? tpl.exercises.map(e => e.id) : [])
     wgPanel.open()
   }
@@ -214,9 +196,9 @@ export default function RoutineTab({
       unit: t.goalMode === 'reps' ? '회' : '초',
     }))
     if (wgTarget) {
-      updateWorkoutGroup(wgTarget.id, { name: wgdName.trim(), color: wgdColor, exercises })
+      updateWorkoutGroup(wgTarget.id, { name: wgdName.trim(), exercises })
     } else {
-      addWorkoutGroup(wgdName.trim(), wgdColor, exercises)
+      addWorkoutGroup(wgdName.trim(), exercises)
     }
     closeWgDetail()
   }
@@ -225,7 +207,6 @@ export default function RoutineTab({
   function openGgDetail(tpl) {
     setGgTarget(tpl ?? null)
     setGgdName(tpl ? tpl.name : '')
-    setGgdColor(tpl ? tpl.color : PALETTE[1])
     setGgdSelectedIds(tpl ? tpl.items.map(i => i.id) : [])
     ggPanel.open()
   }
@@ -235,9 +216,9 @@ export default function RoutineTab({
     if (!ggdName.trim() || selected.length === 0) return
     const items = selected.map(t => ({ id: t.id, text: t.text, count: 1 }))
     if (ggTarget) {
-      updateGeneralGroup(ggTarget.id, { name: ggdName.trim(), color: ggdColor, items })
+      updateGeneralGroup(ggTarget.id, { name: ggdName.trim(), items })
     } else {
-      addGeneralGroup(ggdName.trim(), ggdColor, items)
+      addGeneralGroup(ggdName.trim(), items)
     }
     closeGgDetail()
   }
@@ -348,7 +329,6 @@ export default function RoutineTab({
               <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
                 {wTemplates.map((tpl, i) => (
                   <div key={tpl.id} onClick={() => openWgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tpl.color, flexShrink: 0 }}/>
                     <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: '#000' }}>{tpl.name}</span>
                     <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.exercises.length}개 운동</span>
                     <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
@@ -394,7 +374,6 @@ export default function RoutineTab({
               <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
                 {gTemplates.map((tpl, i) => (
                   <div key={tpl.id} onClick={() => openGgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tpl.color, flexShrink: 0 }}/>
                     <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: '#000' }}>{tpl.name}</span>
                     <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.items.length}개 항목</span>
                     <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
@@ -427,7 +406,7 @@ export default function RoutineTab({
 
           {workoutTasks.length === 0 && generalTasks.length === 0 && wTemplates.length === 0 && gTemplates.length === 0 && (
             <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '14px', marginTop: '24px' }}>
-              오늘 등록된 태스크가 없습니다
+              등록된 태스크가 없습니다
             </div>
           )}
         </div>
@@ -510,12 +489,6 @@ export default function RoutineTab({
               />
             </div>
 
-            {/* 색상 */}
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>색상</div>
-              <ColorPicker value={wgdColor} onChange={setWgdColor} />
-            </div>
-
             {/* 운동 태스크 선택 */}
             <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 16px' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>운동 태스크 선택</div>
@@ -592,12 +565,6 @@ export default function RoutineTab({
                 placeholder="그룹 이름"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent' }}
               />
-            </div>
-
-            {/* 색상 */}
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>색상</div>
-              <ColorPicker value={ggdColor} onChange={setGgdColor} />
             </div>
 
             {/* 일반 태스크 선택 */}

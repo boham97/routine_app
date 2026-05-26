@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { MONTHS, DAYS, addDays } from '../constants.js'
 import { NavCard, NavBtn, EmptyCard } from './ui.jsx'
 import { circle } from '../styles.js'
@@ -33,7 +33,37 @@ export default function TodoTab({
   const hasAvailable = (availableWorkoutTpls?.length ?? 0) + (availableTodoTpls?.length ?? 0) > 0
   const isEmpty = sessionsForDay.length === 0 && groupsForDay.length === 0 && (planTasksForDay?.length ?? 0) === 0
 
-  return <>
+  // ── 좌우 스와이프로 날짜 이동 ─────────────────────────────
+  const swTx  = useRef(null)
+  const swTy  = useRef(null)
+  const swIsH = useRef(false)
+  function onSwipeStart(e) {
+    swTx.current = e.touches[0].clientX
+    swTy.current = e.touches[0].clientY
+    swIsH.current = false
+  }
+  function onSwipeMove(e) {
+    if (swTx.current === null) return
+    const dx = e.touches[0].clientX - swTx.current
+    const dy = e.touches[0].clientY - swTy.current
+    if (!swIsH.current && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+    if (!swIsH.current) swIsH.current = Math.abs(dx) > Math.abs(dy)
+  }
+  function onSwipeEnd(e) {
+    if (swTx.current === null) return
+    const dx = e.changedTouches[0].clientX - swTx.current
+    const isH = swIsH.current
+    swTx.current = null; swIsH.current = false
+    if (!isH || Math.abs(dx) < 60) return
+    setSelectedDate(d => addDays(d, dx > 0 ? -1 : 1))
+  }
+
+  return <div
+    onTouchStart={onSwipeStart}
+    onTouchMove={onSwipeMove}
+    onTouchEnd={onSwipeEnd}
+    style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+  >
     {/* 날짜 네비게이터 */}
     <div style={{ padding: '8px 16px', flexShrink: 0 }}>
       <NavCard>
@@ -87,7 +117,6 @@ export default function TodoTab({
             <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
               {availableWorkoutTpls.map((tpl, i) => (
                 <div key={tpl.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: '8px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tpl.color, flexShrink: 0 }}/>
                   <span style={{ flex: 1, fontSize: '14px', fontWeight: '600' }}>{tpl.name}</span>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => { applyWorkoutTemplate(tpl, 'today'); }} style={scopeBtn('#ff9500', false)}>오늘</button>
@@ -106,7 +135,6 @@ export default function TodoTab({
             <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
               {availableTodoTpls.map((tpl, i) => (
                 <div key={tpl.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: '8px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tpl.color, flexShrink: 0 }}/>
                   <span style={{ flex: 1, fontSize: '14px', fontWeight: '600' }}>{tpl.name}</span>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => { applyTodoTemplate(tpl, 'today'); }} style={scopeBtn('#007aff', false)}>오늘</button>
@@ -152,10 +180,9 @@ export default function TodoTab({
           const progress  = totalSets === 0 ? 0 : doneSets / totalSets
           const expanded  = expandedSession[session.id] !== false
           return (
-            <div key={session.id} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', borderTop: `3px solid ${session.color}` }}>
+            <div key={session.id} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', padding: '14px', gap: '8px' }}>
                 <div onClick={() => setExpandedSession(p => ({ ...p, [session.id]: !expanded }))} style={{ display: 'flex', flex: 1, alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: session.color, flexShrink: 0 }}/>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '15px', fontWeight: '700' }}>{session.name}</span>
@@ -168,7 +195,7 @@ export default function TodoTab({
                 {expanded && <button onClick={() => confirm(`"${session.name}" 운동을 제거할까요?`, () => removeSession(session.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>
               <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
-                <div style={{ height: '3px', background: session.color, width: `${progress * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
+                <div style={{ height: '3px', background: '#34c759', width: `${progress * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
               </div>
               {expanded && session.exercises.map((ex, i) => {
                 const exDone = ex.completedSets.filter(Boolean).length
@@ -184,7 +211,7 @@ export default function TodoTab({
                         const done = val !== false
                         const isRunning = exTimer && exTimer.sessionId === session.id && exTimer.exerciseId === ex.id && exTimer.setIdx === si
                         const isOvertime = isRunning && exTimer.elapsed >= exTimer.total
-                        const btnColor = isRunning ? (isOvertime ? '#ff3b30' : '#ff9500') : (done ? session.color : 'transparent')
+                        const btnColor = isRunning ? (isOvertime ? '#ff3b30' : '#ff9500') : (done ? '#34c759' : 'transparent')
                         const borderColor = btnColor === 'transparent' ? '#c6c6c8' : btnColor
                         const label = isRunning
                           ? (isOvertime ? `+${exTimer.elapsed - exTimer.total}초` : `${exTimer.total - exTimer.elapsed}초`)
@@ -212,10 +239,9 @@ export default function TodoTab({
           const doneCounts  = group.items.reduce((a, item) => a + item.completedCounts.filter(Boolean).length, 0)
           const expanded    = expandedTodoGroup[group.id] !== false
           return (
-            <div key={group.id} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', borderTop: `3px solid ${group.color}` }}>
+            <div key={group.id} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', padding: '14px', gap: '8px' }}>
                 <div onClick={() => setExpandedTodoGroup(p => ({ ...p, [group.id]: !expanded }))} style={{ display: 'flex', flex: 1, alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: group.color, flexShrink: 0 }}/>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '15px', fontWeight: '700' }}>{group.name}</span>
@@ -228,7 +254,7 @@ export default function TodoTab({
                 {expanded && <button onClick={() => confirm(`"${group.name}" 그룹을 제거할까요?`, () => removeTodoGroup(group.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>
               <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
-                <div style={{ height: '3px', background: group.color, width: `${totalCounts === 0 ? 0 : doneCounts / totalCounts * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
+                <div style={{ height: '3px', background: '#34c759', width: `${totalCounts === 0 ? 0 : doneCounts / totalCounts * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
               </div>
               {expanded && group.items.map((item, i) => {
                 const itemDone = item.completedCounts.filter(Boolean).length
@@ -236,7 +262,7 @@ export default function TodoTab({
                   <div key={item.id} style={{ padding: '12px 14px', borderTop: i === 0 ? 'none' : '0.5px solid #e5e5ea' }}>
                     {item.count === 1 ? (
                       <div onClick={() => toggleGroupItemCount(group.id, item.id, 0)} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                        <div style={{ ...circle, background: item.completedCounts[0] ? group.color : 'transparent', border: item.completedCounts[0] ? 'none' : '2px solid #c6c6c8' }}>
+                        <div style={{ ...circle, background: item.completedCounts[0] ? '#34c759' : 'transparent', border: item.completedCounts[0] ? 'none' : '2px solid #c6c6c8' }}>
                           {item.completedCounts[0] && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </div>
                         <span style={{ flex: 1, fontSize: '15px', color: item.completedCounts[0] ? '#8e8e93' : '#000', textDecoration: item.completedCounts[0] ? 'line-through' : 'none' }}>{item.text}</span>
@@ -250,8 +276,8 @@ export default function TodoTab({
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {item.completedCounts.map((done, ci) => (
                             <button key={ci} onClick={() => toggleGroupItemCount(group.id, item.id, ci)} style={{
-                              width: '36px', height: '36px', borderRadius: '8px', border: `1.5px solid ${done ? group.color : '#c6c6c8'}`,
-                              background: done ? group.color : 'transparent', color: done ? '#fff' : '#8e8e93',
+                              width: '36px', height: '36px', borderRadius: '8px', border: `1.5px solid ${done ? '#34c759' : '#c6c6c8'}`,
+                              background: done ? '#34c759' : 'transparent', color: done ? '#fff' : '#8e8e93',
                               fontSize: '13px', fontWeight: '600', cursor: 'pointer',
                             }}>{done ? '✓' : ci + 1}</button>
                           ))}
@@ -269,5 +295,5 @@ export default function TodoTab({
 
       </div>
     </div>
-  </>
+  </div>
 }
