@@ -503,24 +503,24 @@ export default function RoutineTab({
           </div>
 
           {/* 컨텐츠 */}
-          <div style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px' }}>
 
             {/* 이름 */}
-            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ background: '#fff', borderRadius: '14px', flexShrink: 0 }}>
               <input
                 value={wgdName} onChange={e => setWgdName(e.target.value)}
-                placeholder="그룹 이름"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent' }}
+                placeholder="운동 그룹 이름"
+                style={{ width: '100%', height: '52px', boxSizing: 'border-box', padding: '0 16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent', display: 'block', borderRadius: '14px' }}
               />
             </div>
 
-            {/* 운동 태스크 선택 */}
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>운동 태스크 선택</div>
+            {/* 운동 태스크 선택 (내부 스크롤) */}
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 0 14px 16px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0, paddingRight: '16px' }}>운동 태스크 선택</div>
               {workoutTasks.length === 0 ? (
-                <div style={{ fontSize: '14px', color: '#c6c6c8', textAlign: 'center', padding: '16px 0' }}>등록된 운동 태스크가 없습니다</div>
+                <div style={{ fontSize: '14px', color: '#c6c6c8', textAlign: 'center', padding: '16px 16px 16px 0' }}>등록된 운동 태스크가 없습니다</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '8px' }}>
                   {workoutTasks.map(task => {
                     const selected = wgdSelectedIds.includes(task.id)
                     const isReps   = task.goalMode === 'reps'
@@ -528,7 +528,7 @@ export default function RoutineTab({
                       <div
                         key={task.id}
                         onClick={() => setWgdSelectedIds(p => selected ? p.filter(id => id !== task.id) : [...p, task.id])}
-                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#e8f4ff' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#007aff' : 'transparent'}` }}
+                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#e8f4ff' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#007aff' : 'transparent'}`, flexShrink: 0 }}
                       >
                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${selected ? '#007aff' : '#c6c6c8'}`, background: selected ? '#007aff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {selected && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -543,7 +543,7 @@ export default function RoutineTab({
             </div>
 
             {/* 하단 버튼 */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               {wgTarget && (
                 <button
                   onClick={() => confirm(`"${wgTarget.name}" 그룹을 삭제할까요?`, () => { deleteWorkoutTpl(wgTarget.id); closeWgDetail() })}
@@ -581,31 +581,31 @@ export default function RoutineTab({
           </div>
 
           {/* 컨텐츠 */}
-          <div style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px' }}>
 
             {/* 이름 */}
-            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ background: '#fff', borderRadius: '14px', flexShrink: 0 }}>
               <input
                 value={ggdName} onChange={e => setGgdName(e.target.value)}
-                placeholder="그룹 이름"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent' }}
+                placeholder="일반 그룹 이름"
+                style={{ width: '100%', height: '52px', boxSizing: 'border-box', padding: '0 16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent', display: 'block', borderRadius: '14px' }}
               />
             </div>
 
-            {/* 일반 태스크 선택 */}
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>일반 태스크 선택</div>
+            {/* 일반 태스크 선택 (내부 스크롤) */}
+            <div style={{ background: '#fff', borderRadius: '14px', padding: '14px 0 14px 16px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0, paddingRight: '16px' }}>일반 태스크 선택</div>
               {generalTasks.length === 0 ? (
-                <div style={{ fontSize: '14px', color: '#c6c6c8', textAlign: 'center', padding: '16px 0' }}>등록된 일반 태스크가 없습니다</div>
+                <div style={{ fontSize: '14px', color: '#c6c6c8', textAlign: 'center', padding: '16px 16px 16px 0' }}>등록된 일반 태스크가 없습니다</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '8px' }}>
                   {generalTasks.map(task => {
                     const selected = ggdSelectedIds.includes(task.id)
                     return (
                       <div
                         key={task.id}
                         onClick={() => setGgdSelectedIds(p => selected ? p.filter(id => id !== task.id) : [...p, task.id])}
-                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#e8f4ff' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#007aff' : 'transparent'}` }}
+                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#e8f4ff' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#007aff' : 'transparent'}`, flexShrink: 0 }}
                       >
                         <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${selected ? '#007aff' : '#c6c6c8'}`, background: selected ? '#007aff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {selected && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -620,7 +620,7 @@ export default function RoutineTab({
             </div>
 
             {/* 하단 버튼 */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               {ggTarget && (
                 <button
                   onClick={() => confirm(`"${ggTarget.name}" 그룹을 삭제할까요?`, () => { deleteTodoTpl(ggTarget.id); closeGgDetail() })}
