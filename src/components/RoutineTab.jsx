@@ -160,11 +160,14 @@ export default function RoutineTab({
   function handleAdd() {
     if (!canAdd) return
     addTask({ name: name.trim(), taskType: type, goalMode, sets, reps, seconds, desc: desc.trim() })
-    setName(''); setDesc(''); setFormExpanded(false)
+    setName(''); setDesc(''); setSets(''); setReps(''); setSeconds(''); setFormExpanded(false)
   }
 
   function startAdd(taskType) {
     setType(taskType)
+    if (taskType === 'workout') {
+      setSets('4'); setReps('10'); setSeconds('60')
+    }
     setFormExpanded(true)
     setTimeout(() => nameInputRef.current?.focus(), 50)
   }
@@ -285,12 +288,12 @@ export default function RoutineTab({
                       <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>세트 × 횟수</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={sets} onChange={e => setSets(e.target.value)} type="number" min="1" placeholder="4" style={NUM_INPUT} />
+                          <input value={sets} onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
                           <span style={{ fontSize: '12px', color: '#8e8e93' }}>세트</span>
                         </div>
                         <span style={{ fontSize: '22px', color: '#c6c6c8', fontWeight: '300' }}>×</span>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={reps} onChange={e => setReps(e.target.value)} type="number" min="1" placeholder="10" style={NUM_INPUT} />
+                          <input value={reps} onChange={e => setReps(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
                           <span style={{ fontSize: '12px', color: '#8e8e93' }}>횟수</span>
                         </div>
                       </div>
@@ -301,12 +304,12 @@ export default function RoutineTab({
                       <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>세트 × 목표 시간</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={sets} onChange={e => setSets(e.target.value)} type="number" min="1" placeholder="4" style={NUM_INPUT} />
+                          <input value={sets} onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
                           <span style={{ fontSize: '12px', color: '#8e8e93' }}>세트</span>
                         </div>
                         <span style={{ fontSize: '22px', color: '#c6c6c8', fontWeight: '300' }}>×</span>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={seconds} onChange={e => setSeconds(e.target.value)} type="number" min="1" placeholder="60" style={NUM_INPUT} />
+                          <input value={seconds} onChange={e => setSeconds(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
                           <span style={{ fontSize: '12px', color: '#8e8e93' }}>초</span>
                         </div>
                       </div>
@@ -451,7 +454,7 @@ export default function RoutineTab({
               <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '-1px' }}>‹</span> 루틴
             </button>
             <span style={{ flex: 1, textAlign: 'center', fontSize: '17px', fontWeight: '600', color: '#000' }}>{detailTask.text}</span>
-            <button onClick={saveDetail} style={{ background: 'none', border: 'none', color: '#007aff', fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '8px 12px' }}>완료</button>
+            <div style={{ width: '60px' }}/>
           </div>
           <div style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {detailTask.taskType === 'workout' ? (
@@ -474,10 +477,16 @@ export default function RoutineTab({
                 />
               </div>
             )}
-            <button
-              onClick={() => confirm(`"${detailTask.text}" 태스크를 삭제할까요?`, () => { deleteTodo(detailTask.id); closeDetail() })}
-              style={{ width: '100%', height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginTop: '8px' }}
-            >태스크 삭제</button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button
+                onClick={() => confirm(`"${detailTask.text}" 태스크를 삭제할까요?`, () => { deleteTodo(detailTask.id); closeDetail() })}
+                style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+              >삭제</button>
+              <button
+                onClick={saveDetail}
+                style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: '#007aff', color: '#fff', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+              >완료</button>
+            </div>
           </div>
         </div>
       )}

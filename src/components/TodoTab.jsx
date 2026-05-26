@@ -102,7 +102,7 @@ export default function TodoTab({
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
               value={taskInput} onChange={e => setTaskInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
               placeholder="오늘 할 일..."
               style={{ flex: 1, height: '40px', background: '#fff', border: 'none', borderRadius: '10px', padding: '0 12px', fontSize: '15px', outline: 'none' }}
             />
