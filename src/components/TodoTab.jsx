@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { MONTHS, DAYS, addDays } from '../constants.js'
 import { NavCard, NavBtn, EmptyCard } from './ui.jsx'
-import { circle } from '../styles.js'
+import { circle, rateColor } from '../styles.js'
 
 const scopeBtn = (color, outline) => ({
   height: '28px', padding: '0 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
@@ -78,20 +78,23 @@ export default function TodoTab({
         <NavBtn onClick={() => setSelectedDate(d => addDays(d, 1))}>›</NavBtn>
       </NavCard>
 
-      {/* 플랜 추가 토글 버튼 */}
-      <button
-        onClick={() => setShowAdd(v => !v)}
-        style={{
-          width: '100%', marginTop: '8px', height: '36px', borderRadius: '10px', border: 'none',
-          background: showAdd ? '#007aff' : '#fff', color: showAdd ? '#fff' : '#007aff',
-          fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.15s',
-        }}
-      >{showAdd ? '닫기' : '+ 플랜 추가'}</button>
+      {/* 플랜 추가 토글 버튼 (열려있을 땐 숨김) */}
+      {!showAdd && (
+        <button
+          onClick={() => setShowAdd(true)}
+          style={{
+            width: '100%', marginTop: '8px', height: '36px', borderRadius: '10px', border: 'none',
+            background: '#fff', color: '#007aff',
+            fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.15s',
+          }}
+        >+ 플랜 추가</button>
+      )}
     </div>
 
     {/* 추가 패널 */}
     {showAdd && (
-      <div style={{ flexShrink: 0, maxHeight: '42vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', borderBottom: '0.5px solid #c6c6c8', padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ flexShrink: 0, maxHeight: '42vh', display: 'flex', flexDirection: 'column', borderBottom: '0.5px solid #c6c6c8' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '4px 16px 8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {/* 일회성 태스크 */}
         <div>
@@ -119,8 +122,8 @@ export default function TodoTab({
                 <div key={tpl.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: '8px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none' }}>
                   <span style={{ flex: 1, fontSize: '14px', fontWeight: '600' }}>{tpl.name}</span>
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => { applyWorkoutTemplate(tpl, 'today'); }} style={scopeBtn('#ff9500', false)}>오늘</button>
-                    <button onClick={() => { applyWorkoutTemplate(tpl, 'week'); }} style={scopeBtn('#ff9500', true)}>이번주</button>
+                    <button onClick={() => { applyWorkoutTemplate(tpl, 'today'); }} style={scopeBtn('#007aff', false)}>오늘</button>
+                    <button onClick={() => { applyWorkoutTemplate(tpl, 'week'); }} style={scopeBtn('#007aff', true)}>이번주</button>
                   </div>
                 </div>
               ))}
@@ -149,6 +152,17 @@ export default function TodoTab({
         {!hasAvailable && (
           <div style={{ fontSize: '13px', color: '#c6c6c8', textAlign: 'center', padding: '4px 0' }}>추가 가능한 그룹이 없습니다</div>
         )}
+        </div>
+        <div style={{ flexShrink: 0, padding: '8px 16px 12px' }}>
+          <button
+            onClick={() => setShowAdd(false)}
+            style={{
+              width: '100%', height: '40px', borderRadius: '10px', border: 'none',
+              background: '#007aff', color: '#fff',
+              fontSize: '14px', fontWeight: '600', cursor: 'pointer',
+            }}
+          >닫기</button>
+        </div>
       </div>
     )}
 
@@ -190,7 +204,7 @@ export default function TodoTab({
                     </div>
                     <div style={{ fontSize: '11px', color: '#8e8e93', marginTop: '1px' }}>{doneSets}/{totalSets} 세트</div>
                   </div>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: doneSets === totalSets && totalSets > 0 ? '#34c759' : '#8e8e93' }}>{rate(doneSets, totalSets)}%</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: rateColor(doneSets, totalSets) }}>{rate(doneSets, totalSets)}%</span>
                 </div>
                 {expanded && <button onClick={() => confirm(`"${session.name}" 운동을 제거할까요?`, () => removeSession(session.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>
@@ -211,7 +225,7 @@ export default function TodoTab({
                         const done = val !== false
                         const isRunning = exTimer && exTimer.sessionId === session.id && exTimer.exerciseId === ex.id && exTimer.setIdx === si
                         const isOvertime = isRunning && exTimer.elapsed >= exTimer.total
-                        const btnColor = isRunning ? (isOvertime ? '#ff3b30' : '#ff9500') : (done ? '#34c759' : 'transparent')
+                        const btnColor = isRunning ? (isOvertime ? '#ff3b30' : '#007aff') : (done ? '#34c759' : 'transparent')
                         const borderColor = btnColor === 'transparent' ? '#c6c6c8' : btnColor
                         const label = isRunning
                           ? (isOvertime ? `+${exTimer.elapsed - exTimer.total}초` : `${exTimer.total - exTimer.elapsed}초`)
@@ -249,7 +263,7 @@ export default function TodoTab({
                     </div>
                     <div style={{ fontSize: '11px', color: doneCounts === totalCounts && totalCounts > 0 ? '#34c759' : '#8e8e93', marginTop: '1px' }}>{doneCounts}/{totalCounts} 완료</div>
                   </div>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: doneCounts === totalCounts && totalCounts > 0 ? '#34c759' : '#8e8e93' }}>{rate(doneCounts, totalCounts)}%</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: rateColor(doneCounts, totalCounts) }}>{rate(doneCounts, totalCounts)}%</span>
                 </div>
                 {expanded && <button onClick={() => confirm(`"${group.name}" 그룹을 제거할까요?`, () => removeTodoGroup(group.id))} style={{ background: 'none', border: 'none', color: '#ff3b30', fontSize: '13px', fontWeight: '600', cursor: 'pointer', paddingLeft: '12px' }}>제거</button>}
               </div>

@@ -155,11 +155,18 @@ export default function RoutineTab({
   const [wgdSelectedIds, setWgdSelectedIds] = useState([])
 
   const canAdd = name.trim().length > 0
+  const nameInputRef = useRef(null)
 
   function handleAdd() {
     if (!canAdd) return
     addTask({ name: name.trim(), taskType: type, goalMode, sets, reps, seconds, desc: desc.trim() })
     setName(''); setDesc(''); setFormExpanded(false)
+  }
+
+  function startAdd(taskType) {
+    setType(taskType)
+    setFormExpanded(true)
+    setTimeout(() => nameInputRef.current?.focus(), 50)
   }
 
   // ── 태스크 디테일 ──
@@ -239,10 +246,11 @@ export default function RoutineTab({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
               <input
+                ref={nameInputRef}
                 value={name} onChange={e => setName(e.target.value)}
                 onFocus={() => setFormExpanded(true)}
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                placeholder="태스크 이름을 입력하세요"
+                placeholder="추가할 태스크를 입력하세요"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent' }}
               />
             </div>
@@ -251,7 +259,7 @@ export default function RoutineTab({
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>종류</div>
                 <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
                   <button onClick={() => setType('general')} style={SEG(type === 'general', '#007aff')}>📋 일반</button>
-                  <button onClick={() => setType('workout')} style={SEG(type === 'workout', '#ff9500')}>🏋️ 운동</button>
+                  <button onClick={() => setType('workout')} style={SEG(type === 'workout', '#007aff')}>🏋️ 운동</button>
                 </div>
               </div>
               {type === 'general' && (
@@ -268,8 +276,8 @@ export default function RoutineTab({
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>목표 유형</div>
                     <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
-                      <button onClick={() => setGoalMode('reps')} style={SEG(goalMode === 'reps', '#ff9500')}>횟수</button>
-                      <button onClick={() => setGoalMode('time')} style={SEG(goalMode === 'time', '#ff9500')}>시간</button>
+                      <button onClick={() => setGoalMode('reps')} style={SEG(goalMode === 'reps', '#007aff')}>횟수</button>
+                      <button onClick={() => setGoalMode('time')} style={SEG(goalMode === 'time', '#007aff')}>시간</button>
                     </div>
                   </div>
                   {goalMode === 'reps' && (
@@ -306,14 +314,23 @@ export default function RoutineTab({
                   )}
                 </div>
               )}
-              <button
-                onClick={handleAdd} disabled={!canAdd}
-                style={{
-                  height: '52px', borderRadius: '14px', border: 'none', cursor: canAdd ? 'pointer' : 'default',
-                  background: canAdd ? (type === 'workout' ? '#ff9500' : '#007aff') : '#e5e5ea',
-                  color: canAdd ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '700', transition: 'all 0.15s',
-                }}
-              >태스크 추가</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => { setName(''); setDesc(''); setFormExpanded(false) }}
+                  style={{
+                    flex: 1, height: '52px', borderRadius: '14px', border: 'none', cursor: 'pointer',
+                    background: '#fff', color: '#8e8e93', fontSize: '16px', fontWeight: '600', transition: 'all 0.15s',
+                  }}
+                >취소</button>
+                <button
+                  onClick={handleAdd} disabled={!canAdd}
+                  style={{
+                    flex: 1, height: '52px', borderRadius: '14px', border: 'none', cursor: canAdd ? 'pointer' : 'default',
+                    background: canAdd ? '#007aff' : '#e5e5ea',
+                    color: canAdd ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '700', transition: 'all 0.15s',
+                  }}
+                >태스크 추가</button>
+              </div>
             </>}
           </div>
 
@@ -344,7 +361,11 @@ export default function RoutineTab({
           {/* ── 운동 태스크 목록 ── */}
           {workoutTasks.length > 0 && (
             <>
-              <SectionHeader collapsed={workoutCollapsed} onToggle={() => setWorkoutCollapsed(v => !v)} count={workoutTasks.length}>운동 태스크</SectionHeader>
+              <SectionHeader
+                collapsed={workoutCollapsed} onToggle={() => setWorkoutCollapsed(v => !v)}
+                action={!workoutCollapsed ? { label: '+', onClick: () => startAdd('workout') } : null}
+                count={workoutTasks.length}
+              >운동 태스크</SectionHeader>
               {!workoutCollapsed && (
                 <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
                   {workoutTasks.map((task, i) => {
@@ -389,7 +410,11 @@ export default function RoutineTab({
           {/* ── 일반 태스크 목록 ── */}
           {generalTasks.length > 0 && (
             <>
-              <SectionHeader collapsed={generalCollapsed} onToggle={() => setGeneralCollapsed(v => !v)} count={generalTasks.length}>일반 태스크</SectionHeader>
+              <SectionHeader
+                collapsed={generalCollapsed} onToggle={() => setGeneralCollapsed(v => !v)}
+                action={!generalCollapsed ? { label: '+', onClick: () => startAdd('general') } : null}
+                count={generalTasks.length}
+              >일반 태스크</SectionHeader>
               {!generalCollapsed && (
                 <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
                   {generalTasks.map((task, i) => (
@@ -435,10 +460,10 @@ export default function RoutineTab({
                   {detailTask.goalMode === 'reps' ? '세트 × 횟수' : '세트 × 시간'}
                 </div>
                 <div style={{ display: 'flex', gap: '28px' }}>
-                  <Stepper label="세트" value={dSets} onChange={setDSets} color="#ff9500" />
+                  <Stepper label="세트" value={dSets} onChange={setDSets} color="#007aff" />
                   {detailTask.goalMode === 'reps'
-                    ? <Stepper label="횟수" value={dReps} onChange={setDReps} color="#ff9500" />
-                    : <Stepper label="초"   value={dSeconds} onChange={setDSeconds} color="#ff9500" />}
+                    ? <Stepper label="횟수" value={dReps} onChange={setDReps} color="#007aff" />
+                    : <Stepper label="초"   value={dSeconds} onChange={setDSeconds} color="#007aff" />}
                 </div>
               </div>
             ) : (
@@ -503,9 +528,9 @@ export default function RoutineTab({
                       <div
                         key={task.id}
                         onClick={() => setWgdSelectedIds(p => selected ? p.filter(id => id !== task.id) : [...p, task.id])}
-                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#fff3e0' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#ff9500' : 'transparent'}` }}
+                        style={{ display: 'flex', alignItems: 'center', padding: '12px', background: selected ? '#e8f4ff' : '#f9f9f9', borderRadius: '10px', gap: '10px', cursor: 'pointer', border: `1.5px solid ${selected ? '#007aff' : 'transparent'}` }}
                       >
-                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${selected ? '#ff9500' : '#c6c6c8'}`, background: selected ? '#ff9500' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${selected ? '#007aff' : '#c6c6c8'}`, background: selected ? '#007aff' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {selected && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </div>
                         <span style={{ flex: 1, fontSize: '15px', fontWeight: selected ? '600' : '400' }}>{task.text}</span>

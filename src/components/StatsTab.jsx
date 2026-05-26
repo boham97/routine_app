@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { MONTHS, DAYS } from '../constants.js'
-import { sectionLabel } from '../styles.js'
+import { sectionLabel, rateColor } from '../styles.js'
 import { NavCard, NavBtn, EmptyCard, StatCard } from './ui.jsx'
 
 // iOS push 네비게이션 슬라이드 패널
@@ -84,15 +84,6 @@ export default function StatsTab({
 
   // 패널이 닫힐 때 expandedItem 초기화
   useEffect(() => { if (!detail.isOpen) setExpandedItem(null) }, [detail.isOpen])
-
-  const rateColor = (done, total) => {
-    if (total === 0) return '#c6c6c8'
-    const pct = (done / total) * 100
-    if (pct < 25) return '#ff3b30'
-    if (pct < 50) return '#ff9500'
-    if (pct < 75) return '#00c7be'
-    return '#34c759'
-  }
 
   // ── 주 범위 (offset 기반) ─────────────────────────────────────
   const todayDate    = new Date()
@@ -245,11 +236,9 @@ export default function StatsTab({
           {/* 주간 통계 */}
           <div>
             <div style={{ ...sectionLabel, fontSize:'17px', fontWeight:'700', color:'#000' }}>주간 통계</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-
-              {/* 태스크 주간 */}
+            <div style={{ background:'#fff', borderRadius:'12px', overflow:'hidden' }}>
               <div onClick={() => openDetail('task','week')}
-                style={{ background:'#fff', borderRadius:'12px', padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
+                style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>📋 태스크</div>
                 <div style={{ display:'flex', gap:'8px' }}>
                   <StatCard label="추가"   value={totalWeekTasks}                           color="#007aff"/>
@@ -257,13 +246,12 @@ export default function StatsTab({
                   <StatCard label="달성률" value={`${rate(doneWeekTasks,totalWeekTasks)}%`} color={rateColor(doneWeekTasks,totalWeekTasks)}/>
                 </div>
               </div>
-
-              {/* 운동 주간 */}
+              <div style={{ height:'0.5px', background:'#e5e5ea', margin:'0 16px' }}/>
               <div onClick={() => openDetail('workout','week')}
-                style={{ background:'#fff', borderRadius:'12px', padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
+                style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>🏋️ 운동</div>
                 <div style={{ display:'flex', gap:'8px' }}>
-                  <StatCard label="운동일"   value={sessionsWeek.length}  color="#ff9500"/>
+                  <StatCard label="운동일"   value={sessionsWeek.length}  color="#007aff"/>
                   <StatCard label="완료세트" value={doneSetsWeek.length}  color="#34c759"/>
                   <StatCard label="달성률"   value={`${rate(doneSetsWeek.length,allSetsWeek.length)}%`} color={rateColor(doneSetsWeek.length,allSetsWeek.length)}/>
                 </div>
@@ -279,11 +267,9 @@ export default function StatsTab({
                 ({viewYear}년 {MONTHS[viewMonth]}{isCurrentMonth?' · 이번 달':''})
               </span>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-
-              {/* 태스크 월간 */}
+            <div style={{ background:'#fff', borderRadius:'12px', overflow:'hidden' }}>
               <div onClick={() => openDetail('task','month')}
-                style={{ background:'#fff', borderRadius:'12px', padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
+                style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>📋 태스크</div>
                 <div style={{ display:'flex', gap:'8px' }}>
                   <StatCard label="추가"   value={totalTasks}                       color="#007aff"/>
@@ -291,13 +277,12 @@ export default function StatsTab({
                   <StatCard label="달성률" value={`${rate(doneTasks,totalTasks)}%`} color={rateColor(doneTasks,totalTasks)}/>
                 </div>
               </div>
-
-              {/* 운동 월간 */}
+              <div style={{ height:'0.5px', background:'#e5e5ea', margin:'0 16px' }}/>
               <div onClick={() => openDetail('workout','month')}
-                style={{ background:'#fff', borderRadius:'12px', padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
+                style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>🏋️ 운동</div>
                 <div style={{ display:'flex', gap:'8px' }}>
-                  <StatCard label="운동일"   value={sessionsVM.length}  color="#ff9500"/>
+                  <StatCard label="운동일"   value={sessionsVM.length}  color="#007aff"/>
                   <StatCard label="완료세트" value={doneSetsVM.length}  color="#34c759"/>
                   <StatCard label="달성률"   value={`${rate(doneSetsVM.length,allSetsVM.length)}%`} color={rateColor(doneSetsVM.length,allSetsVM.length)}/>
                 </div>
@@ -374,7 +359,7 @@ export default function StatsTab({
                           <div style={{ display:'flex', gap:'12px', fontSize:'12px', color:'#8e8e93' }}>
                             <span>{ex.count}회 수행</span>
                             <span>세트 <b style={{color:'#34c759'}}>{ex.doneSets}</b>/{ex.totalSets}</span>
-                            {ex.totalReps > 0 && <span>총 <b style={{color:'#ff9500'}}>{ex.totalReps}</b>{ex.unit}</span>}
+                            {ex.totalReps > 0 && <span>총 <b style={{color:'#007aff'}}>{ex.totalReps}</b>{ex.unit}</span>}
                           </div>
                         </div>
                       ))

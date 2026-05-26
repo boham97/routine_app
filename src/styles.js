@@ -5,3 +5,12 @@ export const delBtn     = { width:'26px', height:'26px', borderRadius:'50%', bac
 export const inputStyle = { flex:1, height:'44px', background:'#f2f2f7', border:'none', borderRadius:'10px', padding:'0 12px', fontSize:'15px', outline:'none' }
 export const confirmBtn = { height:'44px', padding:'0 16px', background:'#007aff', border:'none', borderRadius:'10px', color:'#fff', fontSize:'15px', fontWeight:'600', cursor:'pointer' }
 export const sectionLabel = { fontSize:'13px', fontWeight:'600', color:'#8e8e93', marginBottom:'8px', paddingLeft:'4px' }
+
+export const rateColor = (done, total) => {
+  if (total === 0) return '#c6c6c8'
+  const pct = (done / total) * 100
+  if (pct < 25) return '#ff3b30'
+  if (pct < 50) return '#ff9500'
+  if (pct < 75) return '#00c7be'
+  return '#34c759'
+}
