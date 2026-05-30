@@ -266,11 +266,11 @@ export default function TodoTab({
       <NavCard>
         <NavBtn onClick={() => navigateDate(-1)}>‹</NavBtn>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '17px', fontWeight: '700' }}>
+          <div style={{ fontSize: '17px', fontWeight: '700', position: 'relative', display: 'inline-block' }}>
             {selectedDate.getFullYear()}년 {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}일
             <span style={{ fontSize: '14px', fontWeight: '500', color: '#8e8e93', marginLeft: '4px' }}>({DAYS[selectedDate.getDay()]})</span>
+            {labelForDate(selectedDate) && <span style={{ position: 'absolute', left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: '6px', fontSize: '12px', fontWeight: '600', color: '#007aff', whiteSpace: 'nowrap' }}>{labelForDate(selectedDate)}</span>}
           </div>
-          {labelForDate(selectedDate) && <div style={{ fontSize: '11px', color: '#007aff', marginTop: '2px' }}>{labelForDate(selectedDate)}</div>}
         </div>
         <NavBtn onClick={() => navigateDate(1)}>›</NavBtn>
       </NavCard>

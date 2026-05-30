@@ -3,10 +3,11 @@ import { dateKey, addDays, getToday, load } from './constants.js'
 import TodoTab from './components/TodoTab.jsx'
 import RoutineTab from './components/RoutineTab.jsx'
 import StatsTab from './components/StatsTab.jsx'
+import FoodTab from './components/FoodTab.jsx'
 import { DrumWheelModal, ConfirmModal } from './components/Modals.jsx'
 
 export default function App() {
-  const TABS = ['todo', 'routine', 'stats']
+  const TABS = ['todo', 'routine', 'stats', 'food']
   const [tabIdx,   setTabIdx]   = useState(0)
   const tab = TABS[tabIdx]
   function setTab(key) { setTabIdx(TABS.indexOf(key)) }
@@ -172,6 +173,14 @@ export default function App() {
   function togglePlanTask(id) { setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t)) }
 
   const planTasksForDay = planTasks.filter(t => t.date === selKey)
+
+  // ── 식자재 관리 ────────────────────────────────────────────
+  const [foods, setFoods] = useState(() => load('foods', []))
+  useEffect(() => { localStorage.setItem('foods', JSON.stringify(foods)) }, [foods])
+  function addFood({ name, expiry, quantity, unit }) {
+    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, unit }])
+  }
+  function removeFood(id) { setFoods(p => p.filter(f => f.id !== id)) }
 
   // ── 할일 그룹 CRUD ─────────────────────────────────────────
   function applyTodoTemplate(tpl, scope = 'today') {
@@ -439,15 +448,15 @@ export default function App() {
       <div style={{ flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
         <div style={{
           display: 'flex',
-          width: '300%',
+          width: '400%',
           height: '100%',
-          transform: `translateX(${-tabIdx * (100/3)}%)`,
+          transform: `translateX(${-tabIdx * (100/4)}%)`,
           transition: 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           willChange: 'transform',
         }}>
 
           {/* 플랜 탭 */}
-          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+          <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <TodoTab
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               labelForDate={labelForDate}
@@ -465,7 +474,7 @@ export default function App() {
           </div>
 
           {/* 루틴 탭 */}
-          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+          <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <RoutineTab
               addTask={addTask} tasks={todos}
               toggleTaskSet={toggleTaskSet}
@@ -476,12 +485,17 @@ export default function App() {
           </div>
 
           {/* 통계 탭 */}
-          <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+          <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <StatsTab
               workoutSessions={workoutSessions}
               todoGroups={todoGroups}
               rate={rate}
             />
+          </div>
+
+          {/* 식자재 탭 */}
+          <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
+            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} />
           </div>
 
         </div>
@@ -505,6 +519,7 @@ export default function App() {
           { key:'todo',    label:'플랜', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
           { key:'routine', label:'루틴',  icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="19" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="5" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="17" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="7" y="10" width="10" height="4" rx="2" fill="currentColor"/></svg> },
           { key:'stats',   label:'통계',  icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="4" height="7" rx="1" fill="currentColor"/><rect x="10" y="9" width="4" height="11" rx="1" fill="currentColor"/><rect x="16" y="5" width="4" height="15" rx="1" fill="currentColor"/></svg> },
+          { key:'food',    label:'식자재', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="2"/><line x1="6" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="2"/><line x1="9" y1="6" x2="9" y2="7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="9" y1="13" x2="9" y2="14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> },
         ].map(t => (
           <button key={t.key} onClick={()=>setTab(t.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', background:'none', border:'none', cursor:'pointer', color: tab===t.key?'#007aff':'#8e8e93' }}>
             {t.icon}

@@ -14,27 +14,34 @@ const NUM_INPUT = {
   color: '#8e8e93',
 }
 
-function SectionHeader({ children, collapsed, onToggle, action, count }) {
+const HEADER_H = 44
+
+function SectionHeader({ children, count, action, top, bottom, innerRef, onClick }) {
   return (
     <div
-      onClick={onToggle}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 4px 8px', cursor: 'pointer', userSelect: 'none' }}
+      ref={innerRef}
+      onClick={onClick}
+      style={{
+        position: 'sticky', top, bottom, zIndex: 5, background: '#f2f2f7',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: `${HEADER_H}px`, padding: '0 4px', userSelect: 'none', cursor: 'pointer',
+      }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-        <span style={{ fontSize: '17px', fontWeight: '700', color: collapsed ? '#000' : '#8e8e93', transition: 'color 0.15s' }}>
+        <span style={{ fontSize: '17px', fontWeight: '700', color: '#000' }}>
           {children}
         </span>
         {count !== undefined && count > 0 && (
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#fff', background: collapsed ? '#8e8e93' : '#c6c6c8', borderRadius: '10px', padding: '1px 7px', transition: 'background 0.15s' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: '#fff', background: '#8e8e93', borderRadius: '10px', padding: '1px 7px' }}>
             {count}
           </span>
         )}
       </div>
       {action && (
-        <div
+        <button
           onClick={e => { e.stopPropagation(); action.onClick() }}
-          style={{ fontSize: '22px', color: '#007aff', lineHeight: 1, fontWeight: '300', padding: '0 4px' }}
-        >{action.label}</div>
+          style={{ height: '30px', padding: '0 18px', background: 'none', color: '#007aff', border: 'none', fontSize: '28px', fontWeight: '300', lineHeight: 1, cursor: 'pointer' }}
+        >{action.label}</button>
       )}
     </div>
   )
@@ -124,21 +131,18 @@ export default function RoutineTab({
   const [reps,     setReps]     = useState('')
   const [seconds,  setSeconds]  = useState('')
   const [desc,     setDesc]     = useState('')
-  const [formExpanded,     setFormExpanded]     = useState(false)
-  const [workoutCollapsed, setWorkoutCollapsed] = useState(false)
-  const [generalCollapsed, setGeneralCollapsed] = useState(false)
 
-  // ── 운동 그룹 섹션 접기 ──
-  const [wgCollapsed, setWgCollapsed] = useState(false)
-
-  // ── 일반 그룹 ──
-  const [ggCollapsed,     setGgCollapsed]     = useState(false)
+  const scrollRef = useRef(null)
+  const headerRefs = useRef({})
 
   // ── 일반 그룹 디테일 패널 ──
   const ggPanel       = useSlidePanel()
   const [ggTarget,       setGgTarget]       = useState(null)
   const [ggdName,        setGgdName]        = useState('')
   const [ggdSelectedIds, setGgdSelectedIds] = useState([])
+
+  // ── 태스크 추가 패널 ──
+  const addPanel = useSlidePanel()
 
   // ── 태스크 디테일 패널 ──
   const taskPanel   = useSlidePanel()
@@ -160,17 +164,18 @@ export default function RoutineTab({
   function handleAdd() {
     if (!canAdd) return
     addTask({ name: name.trim(), taskType: type, goalMode, sets, reps, seconds, desc: desc.trim() })
-    setName(''); setDesc(''); setSets(''); setReps(''); setSeconds(''); setFormExpanded(false)
+    setName(''); setDesc(''); setSets(''); setReps(''); setSeconds('')
+    addPanel.close()
   }
 
   function startAdd(taskType) {
     setType(taskType)
-    if (taskType === 'workout') {
-      setSets('4'); setReps('10'); setSeconds('60')
-    }
-    setFormExpanded(true)
-    setTimeout(() => nameInputRef.current?.focus(), 50)
+    setName(''); setDesc(''); setGoalMode('reps')
+    if (taskType === 'workout') { setSets('4'); setReps('10'); setSeconds('60') }
+    addPanel.open()
+    setTimeout(() => nameInputRef.current?.focus(), 320)
   }
+  function closeAdd() { addPanel.close() }
 
   // ── 태스크 디테일 ──
   function openDetail(task) {
@@ -238,207 +243,198 @@ export default function RoutineTab({
   const wTemplates   = workoutTemplates || []
   const gTemplates   = todoTemplates    || []
 
+  // ── sticky 섹션: 렌더되는 순서대로 위쪽 오프셋 계산 ──
+  // 스크롤하면 지나간 섹션 헤더가 상단에 누적되어 붙음
+  const sectionOrder = ['wg', 'wt', 'gg', 'gt']
+  const topOf = key => `${sectionOrder.indexOf(key) * HEADER_H}px`
+  const botOf = key => `${(sectionOrder.length - 1 - sectionOrder.indexOf(key)) * HEADER_H}px`
+
+  // 헤더는 상·하단 양방향 sticky라 offsetTop이 stuck 위치를 반영해 신뢰 불가.
+  // 각 섹션 앞에 높이 0짜리 static 앵커를 두고 그 offsetTop으로 자연 위치를 잡는다.
+  function scrollToSection(key) {
+    const el = headerRefs.current[key]
+    const cont = scrollRef.current
+    if (!el || !cont) return
+    const target = el.offsetTop - sectionOrder.indexOf(key) * HEADER_H
+    cont.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+  }
+
   return (
     <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-      {/* ── 메인 목록 ── */}
-      <div style={{ height: '100%', overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
 
-          {/* 태스크 등록 폼 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
-              <input
-                ref={nameInputRef}
-                value={name} onChange={e => setName(e.target.value)}
-                onFocus={() => setFormExpanded(true)}
-                onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                placeholder="추가할 태스크를 입력하세요"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent' }}
-              />
-            </div>
-            {formExpanded && <>
-              <div style={{ background: '#fff', borderRadius: '14px', padding: '12px 14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>종류</div>
-                <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
-                  <button onClick={() => setType('general')} style={SEG(type === 'general', '#007aff')}>📋 일반</button>
-                  <button onClick={() => setType('workout')} style={SEG(type === 'workout', '#007aff')}>🏋️ 운동</button>
-                </div>
-              </div>
-              {type === 'general' && (
-                <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
-                  <textarea
-                    value={desc} onChange={e => setDesc(e.target.value)}
-                    placeholder="설명 (선택)" rows={2}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', fontSize: '15px', border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontFamily: 'inherit', color: '#3c3c43', lineHeight: '1.5' }}
-                  />
-                </div>
-              )}
-              {type === 'workout' && (
-                <div style={{ background: '#fff', borderRadius: '14px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>목표 유형</div>
-                    <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
-                      <button onClick={() => setGoalMode('reps')} style={SEG(goalMode === 'reps', '#007aff')}>횟수</button>
-                      <button onClick={() => setGoalMode('time')} style={SEG(goalMode === 'time', '#007aff')}>시간</button>
-                    </div>
-                  </div>
-                  {goalMode === 'reps' && (
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>세트 × 횟수</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={sets} onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
-                          <span style={{ fontSize: '12px', color: '#8e8e93' }}>세트</span>
-                        </div>
-                        <span style={{ fontSize: '22px', color: '#c6c6c8', fontWeight: '300' }}>×</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={reps} onChange={e => setReps(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
-                          <span style={{ fontSize: '12px', color: '#8e8e93' }}>횟수</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {goalMode === 'time' && (
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>세트 × 목표 시간</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={sets} onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
-                          <span style={{ fontSize: '12px', color: '#8e8e93' }}>세트</span>
-                        </div>
-                        <span style={{ fontSize: '22px', color: '#c6c6c8', fontWeight: '300' }}>×</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <input value={seconds} onChange={e => setSeconds(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
-                          <span style={{ fontSize: '12px', color: '#8e8e93' }}>초</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => { setName(''); setDesc(''); setFormExpanded(false) }}
-                  style={{
-                    flex: 1, height: '52px', borderRadius: '14px', border: 'none', cursor: 'pointer',
-                    background: '#fff', color: '#8e8e93', fontSize: '16px', fontWeight: '600', transition: 'all 0.15s',
-                  }}
-                >취소</button>
-                <button
-                  onClick={handleAdd} disabled={!canAdd}
-                  style={{
-                    flex: 1, height: '52px', borderRadius: '14px', border: 'none', cursor: canAdd ? 'pointer' : 'default',
-                    background: canAdd ? '#007aff' : '#e5e5ea',
-                    color: canAdd ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '700', transition: 'all 0.15s',
-                  }}
-                >태스크 추가</button>
-              </div>
-            </>}
-          </div>
+          <div style={{ flexShrink: 0, height: '12px' }} />
+
+          {/* ── 메인 목록 (스크롤) ── */}
+          <div ref={scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '0 16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '16px', minHeight: `calc(100% + ${(sectionOrder.length - 1) * HEADER_H}px)` }}>
 
           {/* ── 운동 그룹 ── */}
+          <div ref={el => { headerRefs.current.wg = el }} style={{ height: 0 }} />
           <SectionHeader
-            collapsed={wgCollapsed} onToggle={() => setWgCollapsed(v => !v)}
-            action={!wgCollapsed ? { label: '+', onClick: () => openWgDetail(null) } : null}
+            onClick={() => scrollToSection('wg')}
+            top={topOf('wg')} bottom={botOf('wg')}
+            action={{ label: '+', onClick: () => openWgDetail(null) }}
             count={wTemplates.length}
           >운동 그룹</SectionHeader>
-
-          {!wgCollapsed && <>
-            {wTemplates.length > 0 && (
-              <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
-                {wTemplates.map((tpl, i) => (
-                  <div key={tpl.id} onClick={() => openWgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                    <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: '#000' }}>{tpl.name}</span>
-                    <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.exercises.length}개 운동</span>
-                    <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {wTemplates.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 4px' }}>운동 그룹이 없습니다</div>
-            )}
-          </>}
+          {wTemplates.length > 0 ? (
+            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
+              {wTemplates.map((tpl, i) => (
+                <div key={tpl.id} onClick={() => openWgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
+                  <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{tpl.name}</span>
+                  <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.exercises.length}개 운동</span>
+                  <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 12px' }}>운동 그룹이 없습니다</div>
+          )}
 
           {/* ── 운동 태스크 목록 ── */}
-          {workoutTasks.length > 0 && (
-            <>
-              <SectionHeader
-                collapsed={workoutCollapsed} onToggle={() => setWorkoutCollapsed(v => !v)}
-                action={!workoutCollapsed ? { label: '+', onClick: () => startAdd('workout') } : null}
-                count={workoutTasks.length}
-              >운동 태스크</SectionHeader>
-              {!workoutCollapsed && (
-                <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
-                  {workoutTasks.map((task, i) => {
-                    const isReps = task.goalMode === 'reps'
-                    return (
-                      <div key={task.id} onClick={() => openDetail(task)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                        <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{task.text}</span>
-                        <span style={{ fontSize: '14px', color: '#8e8e93' }}>{task.sets}세트 · {isReps ? task.reps : task.seconds}{isReps ? '회' : '초'}</span>
-                        <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
+          <div ref={el => { headerRefs.current.wt = el }} style={{ height: 0 }} />
+          <SectionHeader
+            onClick={() => scrollToSection('wt')}
+            top={topOf('wt')} bottom={botOf('wt')}
+            action={{ label: '+', onClick: () => startAdd('workout') }}
+            count={workoutTasks.length}
+          >운동 태스크</SectionHeader>
+          {workoutTasks.length > 0 ? (
+            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
+              {workoutTasks.map((task, i) => {
+                const isReps = task.goalMode === 'reps'
+                return (
+                  <div key={task.id} onClick={() => openDetail(task)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
+                    <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{task.text}</span>
+                    <span style={{ fontSize: '14px', color: '#8e8e93' }}>{task.sets}세트 · {isReps ? task.reps : task.seconds}{isReps ? '회' : '초'}</span>
+                    <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 12px' }}>운동 태스크가 없습니다</div>
           )}
 
           {/* ── 일반 그룹 ── */}
+          <div ref={el => { headerRefs.current.gg = el }} style={{ height: 0 }} />
           <SectionHeader
-            collapsed={ggCollapsed} onToggle={() => setGgCollapsed(v => !v)}
-            action={!ggCollapsed ? { label: '+', onClick: () => openGgDetail(null) } : null}
+            onClick={() => scrollToSection('gg')}
+            top={topOf('gg')} bottom={botOf('gg')}
+            action={{ label: '+', onClick: () => openGgDetail(null) }}
             count={gTemplates.length}
           >일반 그룹</SectionHeader>
-
-          {!ggCollapsed && <>
-            {gTemplates.length > 0 && (
-              <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
-                {gTemplates.map((tpl, i) => (
-                  <div key={tpl.id} onClick={() => openGgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                    <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: '#000' }}>{tpl.name}</span>
-                    <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.items.length}개 항목</span>
-                    <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {gTemplates.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 4px' }}>일반 그룹이 없습니다</div>
-            )}
-          </>}
+          {gTemplates.length > 0 ? (
+            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
+              {gTemplates.map((tpl, i) => (
+                <div key={tpl.id} onClick={() => openGgDetail(tpl)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
+                  <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{tpl.name}</span>
+                  <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{tpl.items.length}개 항목</span>
+                  <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 12px' }}>일반 그룹이 없습니다</div>
+          )}
 
           {/* ── 일반 태스크 목록 ── */}
-          {generalTasks.length > 0 && (
-            <>
-              <SectionHeader
-                collapsed={generalCollapsed} onToggle={() => setGeneralCollapsed(v => !v)}
-                action={!generalCollapsed ? { label: '+', onClick: () => startAdd('general') } : null}
-                count={generalTasks.length}
-              >일반 태스크</SectionHeader>
-              {!generalCollapsed && (
-                <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
-                  {generalTasks.map((task, i) => (
-                    <div key={task.id} onClick={() => openDetail(task)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                      <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{task.text}</span>
-                      {task.desc && <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{task.desc.length > 10 ? task.desc.slice(0, 10) + '…' : task.desc}</span>}
-                      <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
-                    </div>
-                  ))}
+          <div ref={el => { headerRefs.current.gt = el }} style={{ height: 0 }} />
+          <SectionHeader
+            onClick={() => scrollToSection('gt')}
+            top={topOf('gt')} bottom={botOf('gt')}
+            action={{ label: '+', onClick: () => startAdd('general') }}
+            count={generalTasks.length}
+          >일반 태스크</SectionHeader>
+          {generalTasks.length > 0 ? (
+            <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden', marginBottom: '8px' }}>
+              {generalTasks.map((task, i) => (
+                <div key={task.id} onClick={() => openDetail(task)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
+                  <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{task.text}</span>
+                  {task.desc && <span style={{ fontSize: '14px', color: '#8e8e93', flexShrink: 0 }}>{task.desc.length > 10 ? task.desc.slice(0, 10) + '…' : task.desc}</span>}
+                  <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
                 </div>
-              )}
-            </>
-          )}
-
-          {workoutTasks.length === 0 && generalTasks.length === 0 && wTemplates.length === 0 && gTemplates.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '14px', marginTop: '24px' }}>
-              등록된 태스크가 없습니다
+              ))}
             </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#c6c6c8', fontSize: '13px', padding: '8px 0 12px' }}>일반 태스크가 없습니다</div>
           )}
-        </div>
+            </div>
+          </div>
       </div>
+
+      {/* ── 태스크 추가 패널 ── */}
+      {addPanel.isOpen && (
+        <div
+          ref={addPanel.panelRef}
+          onTouchStart={addPanel.onTouchStart}
+          onTouchMove={addPanel.onTouchMove}
+          onTouchEnd={e => addPanel.onTouchEnd(e, closeAdd)}
+          style={{ position: 'absolute', inset: 0, background: '#f2f2f7', transform: addPanel.transform, transition: addPanel.transition, display: 'flex', flexDirection: 'column', zIndex: 10, touchAction: 'pan-y' }}
+        >
+          <div style={{ height: '52px', flexShrink: 0, background: 'rgba(242,242,247,0.96)', borderBottom: '0.5px solid #c6c6c8', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+            <button onClick={closeAdd} style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'none', border: 'none', color: '#007aff', fontSize: '16px', cursor: 'pointer', padding: '8px 10px' }}>
+              <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '-1px' }}>‹</span> 루틴
+            </button>
+            <span style={{ flex: 1, textAlign: 'center', fontSize: '17px', fontWeight: '600', color: '#000' }}>
+              {type === 'workout' ? '새 운동 태스크' : '새 일반 태스크'}
+            </span>
+            <div style={{ width: '60px' }}/>
+          </div>
+          <div style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#fff', borderRadius: '14px' }}>
+              <input
+                ref={nameInputRef}
+                value={name} onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                placeholder={type === 'workout' ? '운동 이름' : '태스크 이름'}
+                style={{ width: '100%', height: '52px', boxSizing: 'border-box', padding: '0 16px', fontSize: '16px', border: 'none', outline: 'none', background: 'transparent', borderRadius: '14px' }}
+              />
+            </div>
+            {type === 'general' && (
+              <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
+                <textarea
+                  value={desc} onChange={e => setDesc(e.target.value)}
+                  placeholder="설명 (선택)" rows={3}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', fontSize: '15px', border: 'none', outline: 'none', background: 'transparent', resize: 'none', fontFamily: 'inherit', color: '#3c3c43', lineHeight: '1.5' }}
+                />
+              </div>
+            )}
+            {type === 'workout' && (
+              <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>목표 유형</div>
+                  <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
+                    <button onClick={() => setGoalMode('reps')} style={SEG(goalMode === 'reps', '#007aff')}>횟수</button>
+                    <button onClick={() => setGoalMode('time')} style={SEG(goalMode === 'time', '#007aff')}>시간</button>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{goalMode === 'reps' ? '세트 × 횟수' : '세트 × 목표 시간'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <input value={sets} onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
+                      <span style={{ fontSize: '12px', color: '#8e8e93' }}>세트</span>
+                    </div>
+                    <span style={{ fontSize: '22px', color: '#c6c6c8', fontWeight: '300' }}>×</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      {goalMode === 'reps'
+                        ? <input value={reps} onChange={e => setReps(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
+                        : <input value={seconds} onChange={e => setSeconds(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />}
+                      <span style={{ fontSize: '12px', color: '#8e8e93' }}>{goalMode === 'reps' ? '횟수' : '초'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={handleAdd} disabled={!canAdd}
+              style={{ height: '52px', borderRadius: '14px', border: 'none', cursor: canAdd ? 'pointer' : 'default', background: canAdd ? '#007aff' : '#e5e5ea', color: canAdd ? '#fff' : '#c6c6c8', fontSize: '16px', fontWeight: '700', marginTop: '4px' }}
+            >추가</button>
+          </div>
+        </div>
+      )}
 
       {/* ── 태스크 디테일 패널 ── */}
       {taskPanel.isOpen && detailTask && (
