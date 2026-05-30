@@ -177,8 +177,8 @@ export default function App() {
   // ── 식자재 관리 ────────────────────────────────────────────
   const [foods, setFoods] = useState(() => load('foods', []))
   useEffect(() => { localStorage.setItem('foods', JSON.stringify(foods)) }, [foods])
-  function addFood({ name, expiry, quantity, unit }) {
-    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, unit }])
+  function addFood({ name, expiry, quantity, unit, storage }) {
+    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, unit, storage }])
   }
   function removeFood(id) { setFoods(p => p.filter(f => f.id !== id)) }
 
@@ -495,7 +495,7 @@ export default function App() {
 
           {/* 식자재 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
-            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} />
+            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} confirm={confirm} />
           </div>
 
         </div>

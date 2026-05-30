@@ -19,7 +19,7 @@ React + Vite SPA. 라우터·상태관리 라이브러리 없음. 모바일 퍼�
 
 **모든 상태는 `App.jsx`에 집중**되어 있고 props로 내려보냄. Context/Redux 없음.
 
-- **영속 상태** (localStorage 동기화): `todos`, `todoTemplates`, `todoGroups`, `workoutTemplates`, `workoutSessions`
+- **영속 상태** (localStorage 동기화): `todos`, `todoTemplates`, `todoGroups`, `workoutTemplates`, `workoutSessions`, `planTasks`, `foods`
 - **UI 상태** (비영속): `tab`, `selectedDate`, `modal`, 타이머 상태 등
 
 각 localStorage 키는 `useEffect`로 개별 동기화. `load(key, fallback)` 유틸(`constants.js`)로 초기 로드.
@@ -36,6 +36,12 @@ workoutSessions[]    날짜에 적용된 운동 인스턴스. templateId + date 
 
 todoTemplates[]      일반 그룹 템플릿. {id, name, color, items:[{id,text,count}]}
 todoGroups[]         날짜에 적용된 일반 인스턴스. templateId + date + completedCounts[]
+
+foods[]              식자재. {id, name, expiry:'YYYY-MM-DD'|null, quantity, unit:'개'|'통', storage:'상온'|'냉장고'|'냉동실'}
+                     unit '개'=개수(숫자), '통'=용기 잔량(0/25/50/75/100% 4칸 막대)
+                     storage 보관 장소(기본 '냉장고'), 목록에 회색 배지로 표시
+                     유통기한 임박할수록 빨간색 배지 (FoodTab의 expiryColor)
+                     유통기한 입력은 인라인 달력(좌우 스와이프로 월 이동)
 ```
 
 **템플릿 → 인스턴스 패턴**: 템플릿을 특정 날짜에 적용하면 completedSets/completedCounts 배열이 추가된 인스턴스(session/group)가 생성됨. 템플릿 삭제 시 연결된 인스턴스도 함께 삭제.
@@ -47,6 +53,7 @@ todoGroups[]         날짜에 적용된 일반 인스턴스. templateId + date 
 | 플랜 | `TodoTab` | 날짜 선택 + 해당 날짜의 workoutSessions·todoGroups 체크 |
 | 루틴 | `RoutineTab` | **오늘** 기준 todos 관리 + workoutTemplates·todoTemplates 관리 |
 | 통계 | `StatsTab` | 월/연간 통계, 검색 |
+| 식자재 | `FoodTab` | 날짜 선택 없는 식자재 목록. 유통기한·수량(개/g) 입력(인라인 달력), 임박순 정렬·빨간색 배지 |
 
 탭 전환: 하단 탭바 버튼 또는 콘텐츠 영역 좌우 스와이프(`onTabSwipeStart/Move/End` in App.jsx).
 
