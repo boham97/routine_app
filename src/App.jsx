@@ -479,7 +479,7 @@ export default function App() {
           <div style={{ width:'33.333%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <StatsTab
               workoutSessions={workoutSessions}
-              planTasks={planTasks} todoGroups={todoGroups}
+              todoGroups={todoGroups}
               rate={rate}
             />
           </div>

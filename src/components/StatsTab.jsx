@@ -22,7 +22,7 @@ function useSlidePanel() {
 
 export default function StatsTab({
   workoutSessions,
-  planTasks, todoGroups,
+  todoGroups,
   rate,
 }) {
   const [viewWeekOffset, setViewWeekOffset] = useState(0)
@@ -109,21 +109,14 @@ export default function StatsTab({
   const isCurrentMonth = viewYear === nowRef.getFullYear() && viewMonth === nowRef.getMonth()
 
   // ── 주간 태스크 ───────────────────────────────────────────────
-  const ptWeek      = (planTasks||[]).filter(t => weekDates.includes(t.date))
   const tgWeek      = (todoGroups||[]).filter(g => weekDates.includes(g.date))
   const tgWeekTotal = tgWeek.reduce((s,g) => s + g.items.reduce((a,item) => a + item.count, 0), 0)
   const tgWeekDone  = tgWeek.reduce((s,g) => s + g.items.reduce((a,item) => a + item.completedCounts.filter(Boolean).length, 0), 0)
-  const totalWeekTasks = ptWeek.length + tgWeekTotal
-  const doneWeekTasks  = ptWeek.filter(t=>t.completed).length + tgWeekDone
+  const totalWeekTasks = tgWeekTotal
+  const doneWeekTasks  = tgWeekDone
 
   const todoWeekStatMap = {}
   const ensureW = t => { if (!todoWeekStatMap[t]) todoWeekStatMap[t] = { text:t, total:0, done:0, history:[] } }
-  ptWeek.forEach(t => {
-    ensureW(t.text)
-    todoWeekStatMap[t.text].total += 1
-    if (t.completed) todoWeekStatMap[t.text].done += 1
-    todoWeekStatMap[t.text].history.push({ date:t.date, done:t.completed?1:0, total:1 })
-  })
   tgWeek.forEach(g => g.items.forEach(item => {
     ensureW(item.text)
     todoWeekStatMap[item.text].total += item.count
@@ -148,22 +141,15 @@ export default function StatsTab({
 
   // ── 월 필터 ────────────────────────────────────────────────────
   const monthStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`
-  const ptVM     = (planTasks||[]).filter(t => t.date.startsWith(monthStr))
   const tgVM     = (todoGroups||[]).filter(g => g.date.startsWith(monthStr))
   const tgTotal    = tgVM.reduce((s,g)=>s+g.items.reduce((a,item)=>a+item.count,0),0)
   const tgDone     = tgVM.reduce((s,g)=>s+g.items.reduce((a,item)=>a+item.completedCounts.filter(Boolean).length,0),0)
-  const totalTasks = ptVM.length + tgTotal
-  const doneTasks  = ptVM.filter(t=>t.completed).length + tgDone
+  const totalTasks = tgTotal
+  const doneTasks  = tgDone
 
   // ── 월간 태스크 ───────────────────────────────────────────────
   const todoStatMap = {}
   const ensureM = t => { if (!todoStatMap[t]) todoStatMap[t] = { text:t, total:0, done:0, history:[] } }
-  ptVM.forEach(t => {
-    ensureM(t.text)
-    todoStatMap[t.text].total += 1
-    if (t.completed) todoStatMap[t.text].done += 1
-    todoStatMap[t.text].history.push({ date:t.date, done:t.completed?1:0, total:1 })
-  })
   tgVM.forEach(g => g.items.forEach(item => {
     ensureM(item.text)
     todoStatMap[item.text].total += item.count
