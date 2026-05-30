@@ -177,8 +177,8 @@ export default function App() {
   // ── 식자재 관리 ────────────────────────────────────────────
   const [foods, setFoods] = useState(() => load('foods', []))
   useEffect(() => { localStorage.setItem('foods', JSON.stringify(foods)) }, [foods])
-  function addFood({ name, expiry, quantity, unit, storage }) {
-    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, unit, storage }])
+  function addFood({ name, expiry, quantity, storage }) {
+    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, storage }])
   }
   function removeFood(id) { setFoods(p => p.filter(f => f.id !== id)) }
 

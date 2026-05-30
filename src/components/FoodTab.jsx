@@ -195,25 +195,11 @@ function fmtDate(expiry) {
   const [y, m, d] = expiry.split('-')
   return `${y}.${m}.${d}`
 }
-function hasQty(q) { return q !== '' && q != null }
-
-// 통(용기) 잔량을 25% 단위 4칸 막대로 표시
-function QuarterBar({ pct }) {
-  const filled = Math.round(pct / 25)
-  return (
-    <span style={{ display: 'inline-flex', gap: '1px' }}>
-      {[0, 1, 2, 3].map(i => (
-        <span key={i} style={{ width: '6px', height: '10px', borderRadius: '1px', background: i < filled ? '#007aff' : '#e5e5ea' }} />
-      ))}
-    </span>
-  )
-}
-
 export default function FoodTab({ foods, addFood, removeFood, confirm }) {
   const [name,   setName]   = useState('')
   const [expiry, setExpiry] = useState('')
   const [qty,    setQty]    = useState('')
-  const [unit,   setUnit]   = useState('개')
+  const [decimal, setDecimal] = useState(false)
   const [storage, setStorage] = useState('냉장고')
   const nameRef = useRef(null)
 
@@ -227,21 +213,33 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
   // ── 슬라이드 패널 (식자재 추가) ───────────────────────────────
   const addPanel = useSlidePanel()
   function openSheet() {
-    setName(''); setExpiry(''); setQty(''); setUnit('개'); setStorage('냉장고')
+    setName(''); setExpiry(''); setQty(''); setDecimal(false); setStorage('냉장고')
     addPanel.open()
     setTimeout(() => nameRef.current?.focus(), 320)
   }
   function closeSheet() { addPanel.close() }
 
-  function switchUnit(u) {
-    setUnit(u)
-    setQty(u === '통' ? '100' : '')
+  function onQtyChange(v) {
+    v = v.replace(/[^0-9.]/g, '')
+    if (decimal) {
+      const [int, frac] = v.split('.')
+      v = int + (v.includes('.') ? '.' + (frac || '').slice(0, 1) : '')
+    } else {
+      v = v.replace(/\..*/, '')
+    }
+    setQty(v)
+  }
+  function toggleDecimal() {
+    const next = !decimal
+    setDecimal(next)
+    if (!next && qty !== '') setQty(String(Math.trunc(Number(qty) || 0)))
   }
 
   const canAdd = name.trim().length > 0
   function handleAdd() {
     if (!canAdd) return
-    addFood({ name: name.trim(), expiry: expiry || null, quantity: qty.trim(), unit, storage })
+    const q = qty.trim() === '' ? '0' : qty.trim()
+    addFood({ name: name.trim(), expiry: expiry || null, quantity: q, storage })
     closeSheet()
   }
 
@@ -269,11 +267,7 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
                   <div style={{ fontSize: '12px', color: '#8e8e93', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     {item.storage && <span style={{ background: '#f2f2f7', color: '#636366', borderRadius: '5px', padding: '1px 6px', fontWeight: '600', flexShrink: 0 }}>{item.storage}</span>}
                     <span>{fmtDate(item.expiry)}</span>
-                    {hasQty(item.quantity) && (item.unit === '통' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>· <QuarterBar pct={Number(item.quantity)} /> {item.quantity}%</span>
-                    ) : (
-                      <span>· {item.quantity}{item.unit || '개'}</span>
-                    ))}
+                    {item.quantity != null && item.quantity !== '' && <span>· {item.quantity}개</span>}
                   </div>
                 </div>
                 <button onClick={() => confirm(`"${item.name}"을(를) 삭제할까요?`, () => removeFood(item.id))} style={{ background: 'none', border: 'none', color: '#c6c6c8', fontSize: '20px', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -327,30 +321,14 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
 
               <div>
                 <div style={fieldLabel}>수량</div>
-                <div style={{ display: 'flex', background: '#fff', borderRadius: '10px', padding: '3px', marginBottom: '8px', width: 'fit-content' }}>
-                  {['개', '통'].map(u => (
-                    <button key={u} onClick={() => switchUnit(u)} style={{
-                      height: '38px', minWidth: '52px', border: 'none', borderRadius: '8px', cursor: 'pointer',
-                      fontSize: '14px', fontWeight: '600',
-                      background: unit === u ? '#007aff' : 'transparent',
-                      color: unit === u ? '#fff' : '#8e8e93',
-                    }}>{u}</button>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="text" inputMode={decimal ? 'decimal' : 'numeric'} value={qty} onChange={e => onQtyChange(e.target.value)} placeholder="0" style={{ ...fieldInput, flex: 1 }} />
+                  <span style={{ fontSize: '15px', color: '#3c3c43', flexShrink: 0 }}>개</span>
                 </div>
-                {unit === '개' ? (
-                  <input type="number" inputMode="numeric" value={qty} onChange={e => setQty(e.target.value)} placeholder="0" style={fieldInput} />
-                ) : (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {['0', '25', '50', '75', '100'].map(p => (
-                      <button key={p} onClick={() => setQty(p)} style={{
-                        flex: 1, height: '44px', border: 'none', borderRadius: '10px', cursor: 'pointer',
-                        fontSize: '14px', fontWeight: '600',
-                        background: qty === p ? '#007aff' : '#fff',
-                        color: qty === p ? '#fff' : '#8e8e93',
-                      }}>{p}%</button>
-                    ))}
-                  </div>
-                )}
+                <button onClick={toggleDecimal} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '10px 2px 0', marginTop: '2px' }}>
+                  <span style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: decimal ? '#007aff' : '#fff', border: decimal ? 'none' : '1.5px solid #c6c6c8', color: '#fff', fontSize: '13px', fontWeight: '700' }}>{decimal ? '✓' : ''}</span>
+                  <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수점 한 자리까지</span>
+                </button>
               </div>
 
               <button onClick={handleAdd} disabled={!canAdd} style={{ width: '100%', height: '44px', borderRadius: '10px', border: 'none', background: canAdd ? '#007aff' : '#c6c6c8', color: '#fff', fontSize: '15px', fontWeight: '700', cursor: canAdd ? 'pointer' : 'default' }}>추가</button>
