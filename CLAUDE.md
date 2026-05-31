@@ -37,11 +37,14 @@ workoutSessions[]    날짜에 적용된 운동 인스턴스. templateId + date 
 todoTemplates[]      일반 그룹 템플릿. {id, name, color, items:[{id,text,count}]}
 todoGroups[]         날짜에 적용된 일반 인스턴스. templateId + date + completedCounts[]
 
-foods[]              식자재. {id, name, expiry:'YYYY-MM-DD'|null, quantity, storage:'상온'|'냉장고'|'냉동실'}
-                     quantity 개수(문자열). 입력 시 '소수점 한 자리까지' 체크하면 소수 허용, 빈 값은 '0'으로 저장. 단위는 '개' 고정
+foods[]              식자재. {id, name, expiry:'YYYY-MM-DD'|null, quantity, storage:'상온'|'냉장고'|'냉동실', decimal}
+                     quantity 수량(문자열). 등록 시 정수(드럼휠·관성·최소 1, 기본 1개). 사용 시 소수 가능
+                     decimal '소수 단위 사용' 체크 여부 플래그. 사용/수정 패널에서 decimal이면 0.2 단위, 아니면 1 단위로 증감
                      storage 보관 장소(기본 '냉장고'), 목록에 회색 배지로 표시
                      유통기한 임박할수록 빨간색 배지 (FoodTab의 expiryColor)
-                     유통기한 입력은 인라인 달력(위아래 스와이프로 월 이동, 위로=다음달, 인접 달 날짜는 연하게)
+                     유통기한 입력은 YYYY.MM.DD readOnly 칸(또는 옆 달력 아이콘) 탭 → 작은 모달 달력에서 선택. 수량은 탭 → 작은 모달 드럼휠
+                     목록 항목 탭 → 사용/수정 슬라이드 패널: 이름·보관·유통기한·소수 단위·남은 수량(운동 태스크 형식 Stepper) 모두 편집, 삭제/완료. updateFood로 저장
+                     달력 모달은 calFor('add'|'edit')로 추가폼/상세폼 중 어느 expRaw를 편집할지 분기
 ```
 
 **템플릿 → 인스턴스 패턴**: 템플릿을 특정 날짜에 적용하면 completedSets/completedCounts 배열이 추가된 인스턴스(session/group)가 생성됨. 템플릿 삭제 시 연결된 인스턴스도 함께 삭제.

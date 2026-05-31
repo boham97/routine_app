@@ -177,10 +177,11 @@ export default function App() {
   // ── 식자재 관리 ────────────────────────────────────────────
   const [foods, setFoods] = useState(() => load('foods', []))
   useEffect(() => { localStorage.setItem('foods', JSON.stringify(foods)) }, [foods])
-  function addFood({ name, expiry, quantity, storage }) {
-    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, storage }])
+  function addFood({ name, expiry, quantity, storage, decimal }) {
+    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, storage, decimal }])
   }
   function removeFood(id) { setFoods(p => p.filter(f => f.id !== id)) }
+  function updateFood(id, patch) { setFoods(p => p.map(f => f.id === id ? { ...f, ...patch } : f)) }
 
   // ── 할일 그룹 CRUD ─────────────────────────────────────────
   function applyTodoTemplate(tpl, scope = 'today') {
@@ -495,7 +496,7 @@ export default function App() {
 
           {/* 식자재 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
-            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} confirm={confirm} />
+            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} updateFood={updateFood} confirm={confirm} />
           </div>
 
         </div>

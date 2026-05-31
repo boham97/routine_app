@@ -195,13 +195,112 @@ function fmtDate(expiry) {
   const [y, m, d] = expiry.split('-')
   return `${y}.${m}.${d}`
 }
-export default function FoodTab({ foods, addFood, removeFood, confirm }) {
+
+// 드래그형 숫자 휠 (키보드 없이 위아래 드래그로 값 선택, 플릭 시 관성 스크롤)
+function NumberWheel({ value, max, min = 0, onChange, width = '100%' }) {
+  const ITEM_H = 46
+  const HALF = 2
+  const BUF = HALF
+  const PX_PER_UNIT = 30          // 작을수록 더 빨리 굴러감
+  const [, force] = useState(0)
+  const rerender = () => force(n => n + 1)
+  const pos = useRef(value)        // 실수 위치 (현재 값 + 소수 오프셋)
+  const dragging = useRef(false)
+  const lastY = useRef(0)
+  const lastT = useRef(0)
+  const vel = useRef(0)            // 단위/ms
+  const raf = useRef(0)
+
+  // 드래그/관성 중이 아닐 때만 외부 value와 동기화
+  useEffect(() => {
+    if (!dragging.current && raf.current === 0) { pos.current = value; rerender() }
+  }, [value])
+
+  const apply = () => {
+    pos.current = Math.min(max, Math.max(min, pos.current))
+    const intVal = Math.round(pos.current)
+    if (intVal !== value) onChange(intVal)
+    rerender()
+  }
+  const onStart = clientY => {
+    if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0 }
+    dragging.current = true
+    lastY.current = clientY; lastT.current = performance.now(); vel.current = 0
+  }
+  const onMove = clientY => {
+    if (!dragging.current) return
+    const now = performance.now()
+    const dPos = (lastY.current - clientY) / PX_PER_UNIT
+    pos.current += dPos
+    const dt = now - lastT.current
+    if (dt > 0) vel.current = dPos / dt
+    lastY.current = clientY; lastT.current = now
+    apply()
+  }
+  const onEnd = () => {
+    if (!dragging.current) return
+    dragging.current = false
+    let last = performance.now()
+    const step = () => {
+      const now = performance.now(); const dt = Math.min(40, now - last); last = now
+      pos.current += vel.current * dt
+      vel.current *= Math.pow(0.95, dt / 16)
+      if (pos.current <= min) { pos.current = min; vel.current = 0 }
+      if (pos.current >= max) { pos.current = max; vel.current = 0 }
+      apply()
+      if (Math.abs(vel.current) > 0.0012) { raf.current = requestAnimationFrame(step) }
+      else { raf.current = 0; pos.current = Math.round(pos.current); apply() }
+    }
+    if (Math.abs(vel.current) > 0.0012) raf.current = requestAnimationFrame(step)
+    else { pos.current = Math.round(pos.current); apply() }
+  }
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current) }, [])
+
+  const offset = (pos.current - value) * ITEM_H
+  const moving = dragging.current || raf.current !== 0
+  return (
+    <div
+      onMouseDown={e => onStart(e.clientY)}
+      onMouseMove={e => onMove(e.clientY)}
+      onMouseUp={onEnd} onMouseLeave={onEnd}
+      onTouchStart={e => { e.stopPropagation(); onStart(e.touches[0].clientY) }}
+      onTouchMove={e => { e.preventDefault(); e.stopPropagation(); onMove(e.touches[0].clientY) }}
+      onTouchEnd={onEnd}
+      style={{ cursor: 'ns-resize', userSelect: 'none', touchAction: 'none', position: 'relative', width, height: ITEM_H * (HALF * 2 + 1), overflow: 'hidden' }}
+    >
+      <div style={{ position: 'absolute', top: HALF * ITEM_H, left: 0, right: 0, height: ITEM_H, background: '#f2f2f7', borderRadius: '8px', pointerEvents: 'none' }} />
+      <div style={{ transform: `translateY(${-offset - BUF * ITEM_H}px)`, transition: moving ? 'none' : 'transform 0.12s ease' }}>
+        {Array.from({ length: HALF * 2 + 1 + BUF * 2 }, (_, i) => {
+          const val = value - HALF - BUF + i
+          const dist = Math.abs(i - (HALF + BUF) - offset / ITEM_H)
+          const opacity = Math.max(0, 1 - dist * 0.45)
+          const fontSize = Math.max(16, 30 - dist * 9)
+          return (
+            <div key={i} style={{ height: ITEM_H, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity }}>
+              {val >= min && val <= max && <span style={{ fontSize, fontWeight: '700', color: val === value ? '#000' : '#8e8e93' }}>{val}</span>}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default function FoodTab({ foods, addFood, removeFood, updateFood, confirm }) {
   const [name,   setName]   = useState('')
-  const [expiry, setExpiry] = useState('')
+  const [expRaw, setExpRaw] = useState('')   // 숫자만 최대 8자리 (YYYYMMDD)
   const [qty,    setQty]    = useState('')
   const [decimal, setDecimal] = useState(false)
   const [storage, setStorage] = useState('냉장고')
   const nameRef = useRef(null)
+  const expiryStr = expRaw.length === 8 ? `${expRaw.slice(0, 4)}-${expRaw.slice(4, 6)}-${expRaw.slice(6, 8)}` : ''
+  function fmtExpInput(d) {
+    if (!d) return ''
+    let s = d.slice(0, 4)
+    if (d.length > 4) s += '.' + d.slice(4, 6)
+    if (d.length > 6) s += '.' + d.slice(6, 8)
+    return s
+  }
 
   const sorted = [...foods].sort((a, b) => {
     if (!a.expiry && !b.expiry) return 0
@@ -212,34 +311,63 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
 
   // ── 슬라이드 패널 (식자재 추가) ───────────────────────────────
   const addPanel = useSlidePanel()
+  const [calOpen, setCalOpen] = useState(false)
+  const [qtyOpen, setQtyOpen] = useState(false)
   function openSheet() {
-    setName(''); setExpiry(''); setQty(''); setDecimal(false); setStorage('냉장고')
+    setName(''); setExpRaw(''); setQty('1'); setDecimal(false); setStorage('냉장고')
     addPanel.open()
     setTimeout(() => nameRef.current?.focus(), 320)
   }
   function closeSheet() { addPanel.close() }
 
-  function onQtyChange(v) {
-    v = v.replace(/[^0-9.]/g, '')
-    if (decimal) {
-      const [int, frac] = v.split('.')
-      v = int + (v.includes('.') ? '.' + (frac || '').slice(0, 1) : '')
-    } else {
-      v = v.replace(/\..*/, '')
-    }
-    setQty(v)
+  // ── 슬라이드 패널 (식자재 사용/수정) ──────────────────────────
+  const usePanel = useSlidePanel()
+  const [detailId, setDetailId] = useState(null)
+  const [dName, setDName] = useState('')
+  const [dStorage, setDStorage] = useState('냉장고')
+  const [dExpRaw, setDExpRaw] = useState('')
+  const [dDecimal, setDDecimal] = useState(false)
+  const [dQty, setDQty] = useState(0)
+  const detail = foods.find(f => f.id === detailId) || null
+  const dExpiryStr = dExpRaw.length === 8 ? `${dExpRaw.slice(0, 4)}-${dExpRaw.slice(4, 6)}-${dExpRaw.slice(6, 8)}` : ''
+  const detailStep = dDecimal ? 0.2 : 1
+  const round1 = v => Math.round(v * 10) / 10
+  const fmtQ = v => (dDecimal ? round1(v).toFixed(1) : String(Math.round(v)))
+  const dCanSave = dName.trim().length > 0
+  function openDetail(item) {
+    setDetailId(item.id)
+    setDName(item.name)
+    setDStorage(item.storage || '냉장고')
+    setDExpRaw(item.expiry ? item.expiry.replace(/-/g, '') : '')
+    setDDecimal(!!item.decimal)
+    setDQty(Number(item.quantity) || 0)
+    usePanel.open()
   }
-  function toggleDecimal() {
-    const next = !decimal
-    setDecimal(next)
-    if (!next && qty !== '') setQty(String(Math.trunc(Number(qty) || 0)))
+  function closeDetail() { usePanel.close() }
+  function saveDetail() {
+    if (!detail || !dCanSave) return
+    updateFood(detail.id, { name: dName.trim(), storage: dStorage, expiry: dExpiryStr || null, decimal: dDecimal, quantity: fmtQ(dQty) })
+    closeDetail()
+  }
+
+  const intPart = Math.trunc(Number(qty) || 0)
+  function setIntPart(n) { setQty(String(n)) }
+
+  // 달력 모달: 'add'(추가폼) 또는 'edit'(상세폼) 대상에 따라 값/콜백 분기
+  const [calFor, setCalFor] = useState('add')
+  function openCal(target) { setCalFor(target); setCalOpen(true) }
+  function pickDate(key) {
+    const set = calFor === 'edit' ? setDExpRaw : setExpRaw
+    if (key) { const [y, m, d] = key.split('-'); set(y + m + d) }
+    else set('')
+    setCalOpen(false)
   }
 
   const canAdd = name.trim().length > 0
   function handleAdd() {
     if (!canAdd) return
-    const q = qty.trim() === '' ? '0' : qty.trim()
-    addFood({ name: name.trim(), expiry: expiry || null, quantity: q, storage })
+    const q = qty.trim() === '' ? '0' : String(Math.trunc(Number(qty) || 0))
+    addFood({ name: name.trim(), expiry: expiryStr || null, quantity: q, storage, decimal })
     closeSheet()
   }
 
@@ -258,7 +386,7 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
             const days = daysUntil(item.expiry)
             const color = expiryColor(days)
             return (
-              <div key={item.id} style={{ background: '#fff', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div key={item.id} onClick={() => openDetail(item)} style={{ background: '#fff', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <div style={{ width: '52px', height: '40px', borderRadius: '10px', background: color, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ fontSize: '13px', fontWeight: '700', lineHeight: 1 }}>{expiryLabel(days)}</span>
                 </div>
@@ -270,7 +398,7 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
                     {item.quantity != null && item.quantity !== '' && <span>· {item.quantity}개</span>}
                   </div>
                 </div>
-                <button onClick={() => confirm(`"${item.name}"을(를) 삭제할까요?`, () => removeFood(item.id))} style={{ background: 'none', border: 'none', color: '#c6c6c8', fontSize: '20px', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
               </div>
             )
           })}
@@ -316,22 +444,136 @@ export default function FoodTab({ foods, addFood, removeFood, confirm }) {
 
               <div>
                 <div style={fieldLabel}>유통기한</div>
-                <Calendar value={expiry} onChange={setExpiry} />
+                <div style={{ position: 'relative' }}>
+                  <input readOnly value={fmtExpInput(expRaw)} onClick={() => openCal('add')} placeholder="YYYY.MM.DD" style={{ ...fieldInput, paddingRight: '46px', cursor: 'pointer' }} />
+                  <button onClick={() => openCal('add')} style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', borderRadius: '8px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#007aff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div>
                 <div style={fieldLabel}>수량</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="text" inputMode={decimal ? 'decimal' : 'numeric'} value={qty} onChange={e => onQtyChange(e.target.value)} placeholder="0" style={{ ...fieldInput, flex: 1 }} />
-                  <span style={{ fontSize: '15px', color: '#3c3c43', flexShrink: 0 }}>개</span>
-                </div>
-                <button onClick={toggleDecimal} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '10px 2px 0', marginTop: '2px' }}>
+                <button onClick={() => setQtyOpen(true)} style={{ ...fieldInput, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                  <span style={{ color: qty.trim() === '' ? '#c6c6c8' : '#000' }}>{intPart}개</span>
+                  <span style={{ color: '#c6c6c8', fontSize: '20px', lineHeight: 1 }}>›</span>
+                </button>
+                <button onClick={() => setDecimal(d => !d)} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', height: '40px', marginTop: '4px' }}>
                   <span style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: decimal ? '#007aff' : '#fff', border: decimal ? 'none' : '1.5px solid #c6c6c8', color: '#fff', fontSize: '13px', fontWeight: '700' }}>{decimal ? '✓' : ''}</span>
-                  <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수점 한 자리까지</span>
+                  <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수 단위 사용</span>
                 </button>
               </div>
 
-              <button onClick={handleAdd} disabled={!canAdd} style={{ width: '100%', height: '44px', borderRadius: '10px', border: 'none', background: canAdd ? '#007aff' : '#c6c6c8', color: '#fff', fontSize: '15px', fontWeight: '700', cursor: canAdd ? 'pointer' : 'default' }}>추가</button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button onClick={closeSheet} style={{ flex: 1, height: '48px', borderRadius: '10px', border: 'none', background: '#fff', color: '#8e8e93', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>취소</button>
+                <button onClick={handleAdd} disabled={!canAdd} style={{ flex: 1, height: '48px', borderRadius: '10px', border: 'none', background: canAdd ? '#007aff' : '#c6c6c8', color: '#fff', fontSize: '15px', fontWeight: '700', cursor: canAdd ? 'pointer' : 'default' }}>추가</button>
+              </div>
+          </div>
+        </div>
+      )}
+
+      {/* 식자재 사용/수정 패널 */}
+      {usePanel.isOpen && detail && (
+        <div
+          ref={usePanel.panelRef}
+          onTouchStart={usePanel.onTouchStart}
+          onTouchMove={usePanel.onTouchMove}
+          onTouchEnd={e => usePanel.onTouchEnd(e, closeDetail)}
+          style={{ position: 'absolute', inset: 0, background: '#f2f2f7', transform: usePanel.transform, transition: usePanel.transition, display: 'flex', flexDirection: 'column', zIndex: 20, touchAction: 'pan-y' }}
+        >
+          <div style={{ height: '52px', flexShrink: 0, background: 'rgba(242,242,247,0.96)', borderBottom: '0.5px solid #c6c6c8', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+            <button onClick={closeDetail} style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'none', border: 'none', color: '#007aff', fontSize: '16px', cursor: 'pointer', padding: '8px 10px' }}>
+              <span style={{ fontSize: '22px', lineHeight: 1, marginTop: '-1px' }}>‹</span> 식자재
+            </button>
+            <span style={{ flex: 1, textAlign: 'center', fontSize: '17px', fontWeight: '600', color: '#000' }}>{detail.name}</span>
+            <div style={{ width: '60px' }} />
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+              <div>
+                <div style={fieldLabel}>이름</div>
+                <input value={dName} onChange={e => setDName(e.target.value)} placeholder="식자재 이름" style={fieldInput} />
+              </div>
+
+              <div>
+                <div style={fieldLabel}>보관</div>
+                <div style={{ display: 'flex', background: '#fff', borderRadius: '10px', padding: '3px', gap: '3px' }}>
+                  {['상온', '냉장고', '냉동실'].map(s => (
+                    <button key={s} onClick={() => setDStorage(s)} style={{
+                      flex: 1, height: '38px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                      fontSize: '14px', fontWeight: '600',
+                      background: dStorage === s ? '#007aff' : 'transparent',
+                      color: dStorage === s ? '#fff' : '#8e8e93',
+                    }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={fieldLabel}>유통기한</div>
+                <div style={{ position: 'relative' }}>
+                  <input readOnly value={fmtExpInput(dExpRaw)} onClick={() => openCal('edit')} placeholder="YYYY.MM.DD" style={{ ...fieldInput, paddingRight: '46px', cursor: 'pointer' }} />
+                  <button onClick={() => openCal('edit')} style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', borderRadius: '8px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#007aff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style={fieldLabel}>남은 수량 · {dDecimal ? '0.2개' : '1개'} 단위</div>
+                <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <button onClick={() => setDQty(v => Math.max(0, round1(v - detailStep)))} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '10px 0 0 10px', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1 }}>−</button>
+                    <div style={{ minWidth: '96px', height: '48px', background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderLeft: '0.5px solid #d1d1d6', borderRight: '0.5px solid #d1d1d6' }}>
+                      <span style={{ fontSize: '22px', fontWeight: '700', color: '#000', lineHeight: 1 }}>{fmtQ(dQty)}</span>
+                      <span style={{ fontSize: '14px', color: '#8e8e93', lineHeight: 1 }}>개</span>
+                    </div>
+                    <button onClick={() => setDQty(v => round1(v + detailStep))} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '0 10px 10px 0', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1 }}>+</button>
+                  </div>
+                </div>
+                <button onClick={() => setDDecimal(d => !d)} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', height: '40px', marginTop: '4px' }}>
+                  <span style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dDecimal ? '#007aff' : '#fff', border: dDecimal ? 'none' : '1.5px solid #c6c6c8', color: '#fff', fontSize: '13px', fontWeight: '700' }}>{dDecimal ? '✓' : ''}</span>
+                  <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수 단위 사용</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <button onClick={() => confirm(`"${detail.name}"을(를) 삭제할까요?`, () => { removeFood(detail.id); closeDetail() })} style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: '#fff', color: '#ff3b30', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>삭제</button>
+                <button onClick={saveDetail} disabled={!dCanSave} style={{ flex: 1, height: '50px', border: 'none', borderRadius: '14px', background: dCanSave ? '#007aff' : '#c6c6c8', color: '#fff', fontSize: '16px', fontWeight: '600', cursor: dCanSave ? 'pointer' : 'default' }}>완료</button>
+              </div>
+          </div>
+        </div>
+      )}
+
+      {/* 유통기한 달력 모달 */}
+      {calOpen && (
+        <div onClick={() => setCalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '320px', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '16px', fontWeight: '700', color: '#000' }}>유통기한</span>
+              <button onClick={() => pickDate('')} style={{ background: 'none', border: 'none', color: '#8e8e93', fontSize: '14px', cursor: 'pointer', padding: '2px 4px' }}>없음</button>
+            </div>
+            <div style={{ padding: '12px 16px' }}>
+              <Calendar value={calFor === 'edit' ? dExpiryStr : expiryStr} onChange={pickDate} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 수량 선택 모달 */}
+      {qtyOpen && (
+        <div onClick={() => setQtyOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '280px', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px 8px', textAlign: 'center', fontSize: '16px', fontWeight: '700', color: '#000' }}>수량</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '0 24px' }}>
+              <div style={{ flex: 1 }}><NumberWheel value={intPart} min={1} max={999} onChange={setIntPart} /></div>
+              <span style={{ fontSize: '17px', color: '#3c3c43', flexShrink: 0 }}>개</span>
+            </div>
+            <button onClick={() => setQtyOpen(false)} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', borderTop: '0.5px solid #e5e5ea', fontSize: '15px', fontWeight: '700', color: '#007aff', cursor: 'pointer', marginTop: '8px' }}>완료</button>
           </div>
         </div>
       )}
