@@ -44,6 +44,7 @@ foods[]              식자재. {id, name, expiry:'YYYY-MM-DD'|null, quantity, s
                      유통기한 임박할수록 빨간색 배지 (FoodTab의 expiryColor)
                      유통기한 입력은 YYYY.MM.DD readOnly 칸(또는 옆 달력 아이콘) 탭 → 작은 모달 달력에서 선택. 수량은 탭 → 작은 모달 드럼휠
                      목록 항목 탭 → 사용/수정 슬라이드 패널: 이름·보관·유통기한·소수 단위·남은 수량(운동 태스크 형식 Stepper) 모두 편집, 삭제/완료. updateFood로 저장
+                     남은 수량 0개로 저장하면 항목 삭제(체크 옆 빨간 '0개 되면 삭제됩니다' 경고)
                      달력 모달은 calFor('add'|'edit')로 추가폼/상세폼 중 어느 expRaw를 편집할지 분기
 ```
 
@@ -56,7 +57,7 @@ foods[]              식자재. {id, name, expiry:'YYYY-MM-DD'|null, quantity, s
 | 플랜 | `TodoTab` | 날짜 선택 + 해당 날짜의 workoutSessions·todoGroups 체크 |
 | 루틴 | `RoutineTab` | **오늘** 기준 todos 관리 + workoutTemplates·todoTemplates 관리 |
 | 통계 | `StatsTab` | 월/연간 통계, 검색 |
-| 식자재 | `FoodTab` | 날짜 선택 없는 식자재 목록. 유통기한·수량(개, 소수 옵션)·보관 입력(슬라이드 패널+인라인 달력), 임박순 정렬·빨간색 배지 |
+| 식자재 | `FoodTab` | 날짜 선택 없는 식자재 목록. 추가는 슬라이드 패널, 유통기한·수량은 작은 모달(달력/드럼휠), 임박순 정렬·빨간색 배지. 항목 탭 → 사용/수정 패널(수량 ±, 0이면 삭제) |
 
 탭 전환: 하단 탭바 버튼 또는 콘텐츠 영역 좌우 스와이프(`onTabSwipeStart/Move/End` in App.jsx).
 
@@ -88,7 +89,8 @@ Web Audio API(`AudioContext`)로 완료 비프음. iOS 정책상 사용자 터�
 ### 스타일 규칙
 
 - `src/styles.js` — TodoTab·StatsTab에서 쓰는 공유 스타일 상수
-- `src/components/ui.jsx` — NavCard, NavBtn, EmptyCard, StatCard 등 공유 컴포넌트
+- `src/components/ui.jsx` — NavCard, NavBtn, EmptyCard, StatCard 등 공유 컴포넌트 + `useHold` 훅(버튼 길게 누르면 반복 실행: 즉시 1회 → 450ms 후 140ms 간격 반복. 포인터 이벤트 기반)
+  - `useHold`는 RoutineTab `Stepper`(세트/횟수/초)와 FoodTab 수량 ± 버튼에서 사용
 - `RoutineTab.jsx` — SEG(세그먼트 버튼), NUM_INPUT, SectionHeader, Stepper, ColorPicker를 파일 내 로컬 정의
 - 색상 팔레트: `PALETTE` 배열(`constants.js`), 기본 8색
 

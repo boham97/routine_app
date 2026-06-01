@@ -1,3 +1,22 @@
+import { useRef, useEffect } from 'react'
+
+// 길게 누르면 반복 실행 (꾹 누르기). 포인터 다운 시 즉시 1회, 이후 반복.
+export function useHold() {
+  const t = useRef(null)
+  const iv = useRef(null)
+  function stop() {
+    if (t.current) { clearTimeout(t.current); t.current = null }
+    if (iv.current) { clearInterval(iv.current); iv.current = null }
+  }
+  function start(fn) {
+    stop()
+    fn()
+    t.current = setTimeout(() => { iv.current = setInterval(fn, 140) }, 450)
+  }
+  useEffect(() => stop, [])
+  return { start, stop }
+}
+
 export function NavCard({ children }) {
   return <div style={{ background:'#fff', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 8px' }}>{children}</div>
 }

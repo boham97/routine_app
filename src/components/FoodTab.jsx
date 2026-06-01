@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { getToday, dateKey, MONTHS, DAYS } from '../constants.js'
-import { EmptyCard } from './ui.jsx'
+import { EmptyCard, useHold } from './ui.jsx'
 
 // 한 달치 날짜 그리드 (항상 6줄 = 42칸, 앞뒤로 인접 달 날짜를 이어서 채우되 연하게)
 function MonthGrid({ y, m, value, onChange }) {
@@ -333,6 +333,13 @@ export default function FoodTab({ foods, addFood, removeFood, updateFood, confir
   const detailStep = dDecimal ? 0.2 : 1
   const round1 = v => Math.round(v * 10) / 10
   const fmtQ = v => (dDecimal ? round1(v).toFixed(1) : String(Math.round(v)))
+  const qtyHold = useHold()
+  const decQ = () => setDQty(v => Math.max(0, round1(v - detailStep)))
+  const incQ = () => setDQty(v => round1(v + detailStep))
+  const qtyHoldProps = fn => ({
+    onPointerDown: e => { e.preventDefault(); qtyHold.start(fn) },
+    onPointerUp: qtyHold.stop, onPointerLeave: qtyHold.stop, onPointerCancel: qtyHold.stop,
+  })
   const dCanSave = dName.trim().length > 0
   function openDetail(item) {
     setDetailId(item.id)
@@ -344,8 +351,10 @@ export default function FoodTab({ foods, addFood, removeFood, updateFood, confir
     usePanel.open()
   }
   function closeDetail() { usePanel.close() }
+  const willDelete = Number(fmtQ(dQty)) === 0
   function saveDetail() {
     if (!detail || !dCanSave) return
+    if (willDelete) { removeFood(detail.id); closeDetail(); return }
     updateFood(detail.id, { name: dName.trim(), storage: dStorage, expiry: dExpiryStr || null, decimal: dDecimal, quantity: fmtQ(dQty) })
     closeDetail()
   }
@@ -527,18 +536,21 @@ export default function FoodTab({ foods, addFood, removeFood, updateFood, confir
                 <div style={fieldLabel}>남은 수량 · {dDecimal ? '0.2개' : '1개'} 단위</div>
                 <div style={{ background: '#fff', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <button onClick={() => setDQty(v => Math.max(0, round1(v - detailStep)))} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '10px 0 0 10px', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1 }}>−</button>
+                    <button {...qtyHoldProps(decQ)} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '10px 0 0 10px', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1, touchAction: 'none' }}>−</button>
                     <div style={{ minWidth: '96px', height: '48px', background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderLeft: '0.5px solid #d1d1d6', borderRight: '0.5px solid #d1d1d6' }}>
                       <span style={{ fontSize: '22px', fontWeight: '700', color: '#000', lineHeight: 1 }}>{fmtQ(dQty)}</span>
                       <span style={{ fontSize: '14px', color: '#8e8e93', lineHeight: 1 }}>개</span>
                     </div>
-                    <button onClick={() => setDQty(v => round1(v + detailStep))} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '0 10px 10px 0', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1 }}>+</button>
+                    <button {...qtyHoldProps(incQ)} style={{ width: '48px', height: '48px', border: 'none', background: '#ebebeb', borderRadius: '0 10px 10px 0', fontSize: '24px', cursor: 'pointer', color: '#007aff', fontWeight: '700', lineHeight: 1, touchAction: 'none' }}>+</button>
                   </div>
                 </div>
-                <button onClick={() => setDDecimal(d => !d)} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', height: '40px', marginTop: '4px' }}>
-                  <span style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dDecimal ? '#007aff' : '#fff', border: dDecimal ? 'none' : '1.5px solid #c6c6c8', color: '#fff', fontSize: '13px', fontWeight: '700' }}>{dDecimal ? '✓' : ''}</span>
-                  <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수 단위 사용</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginTop: '4px' }}>
+                  <button onClick={() => setDDecimal(d => !d)} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', height: '40px' }}>
+                    <span style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: dDecimal ? '#007aff' : '#fff', border: dDecimal ? 'none' : '1.5px solid #c6c6c8', color: '#fff', fontSize: '13px', fontWeight: '700' }}>{dDecimal ? '✓' : ''}</span>
+                    <span style={{ fontSize: '14px', color: '#3c3c43' }}>소수 단위 사용</span>
+                  </button>
+                  {willDelete && <span style={{ fontSize: '13px', fontWeight: '600', color: '#ff3b30', flexShrink: 0 }}>0개 되면 삭제됩니다</span>}
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>

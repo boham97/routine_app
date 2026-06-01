@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useHold } from './ui.jsx'
 
 const SEG = (active, color = '#007aff') => ({
   flex: 1, padding: '7px', border: 'none', borderRadius: '7px', fontSize: '14px',
@@ -48,12 +49,20 @@ function SectionHeader({ children, count, action, top, bottom, innerRef, onClick
 }
 
 function Stepper({ label, value, onChange, color = '#007aff' }) {
+  const valRef = useRef(value); valRef.current = value
+  const hold = useHold()
+  const dec = () => { const n = Math.max(1, valRef.current - 1); valRef.current = n; onChange(n) }
+  const inc = () => { const n = valRef.current + 1; valRef.current = n; onChange(n) }
+  const holdProps = fn => ({
+    onPointerDown: e => { e.preventDefault(); hold.start(fn) },
+    onPointerUp: hold.stop, onPointerLeave: hold.stop, onPointerCancel: hold.stop,
+  })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <button onClick={() => onChange(Math.max(1, value - 1))} style={{ width: '34px', height: '34px', border: 'none', background: '#ebebeb', borderRadius: '8px 0 0 8px', fontSize: '20px', cursor: 'pointer', color, fontWeight: '700', lineHeight: 1 }}>−</button>
+        <button {...holdProps(dec)} style={{ width: '34px', height: '34px', border: 'none', background: '#ebebeb', borderRadius: '8px 0 0 8px', fontSize: '20px', cursor: 'pointer', color, fontWeight: '700', lineHeight: 1, touchAction: 'none' }}>−</button>
         <div style={{ minWidth: '48px', height: '34px', background: '#ebebeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '700', borderLeft: '0.5px solid #d1d1d6', borderRight: '0.5px solid #d1d1d6' }}>{value}</div>
-        <button onClick={() => onChange(value + 1)} style={{ width: '34px', height: '34px', border: 'none', background: '#ebebeb', borderRadius: '0 8px 8px 0', fontSize: '20px', cursor: 'pointer', color, fontWeight: '700', lineHeight: 1 }}>+</button>
+        <button {...holdProps(inc)} style={{ width: '34px', height: '34px', border: 'none', background: '#ebebeb', borderRadius: '0 8px 8px 0', fontSize: '20px', cursor: 'pointer', color, fontWeight: '700', lineHeight: 1, touchAction: 'none' }}>+</button>
       </div>
       <span style={{ fontSize: '11px', color: '#8e8e93' }}>{label}</span>
     </div>

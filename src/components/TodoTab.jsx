@@ -13,7 +13,7 @@ const scopeBtn = (color, outline) => ({
 export default function TodoTab({
   selectedDate, setSelectedDate,
   labelForDate,
-  sessionsForDay, expandedSession, setExpandedSession, toggleSet, exTimer,
+  sessionsForDay, expandedSession, setExpandedSession, toggleSet, addExerciseSet, exTimer,
   groupsForDay, expandedTodoGroup, setExpandedTodoGroup, toggleGroupItemCount, removeTodoGroup,
   removeSession,
   confirm, rate,
@@ -163,7 +163,7 @@ export default function TodoTab({
                       <span style={{ fontSize: '15px', fontWeight: '600' }}>{ex.name}</span>
                       <span style={{ fontSize: '12px', color: '#8e8e93' }}>{exDone}/{ex.sets}세트 · {ex.reps}{ex.unit}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                       {Array.from({ length: ex.sets }, (_, si) => {
                         const val = ex.completedSets?.[si] ?? false
                         const done = val !== false
@@ -183,6 +183,11 @@ export default function TodoTab({
                           }}>{label}</button>
                         )
                       })}
+                      <button
+                        onClick={() => addExerciseSet(session.id, ex.id)}
+                        aria-label="세트 추가"
+                        style={{ width: '36px', height: '36px', borderRadius: '8px', border: 'none', background: '#34c759', color: '#fff', fontSize: '22px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+                      >+</button>
                     </div>
                   </div>
                 )

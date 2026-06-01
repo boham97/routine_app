@@ -262,6 +262,13 @@ export default function App() {
     if (exTimer?.sessionId === id) { clearInterval(exTimerIntervalRef.current); setExTimer(null) }
     setWorkoutSessions(p => p.filter(s => s.id !== id))
   }
+  function addExerciseSet(sessionId, exerciseId) {
+    setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
+      ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
+        ...e, sets: (e.sets || 0) + 1, completedSets: [...(e.completedSets || []), false],
+      })
+    }))
+  }
   function toggleSet(sessionId, exerciseId, setIdx) {
     const session = workoutSessions.find(s => s.id === sessionId)
     const ex = session?.exercises.find(e => e.id === exerciseId)
@@ -461,7 +468,7 @@ export default function App() {
             <TodoTab
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               labelForDate={labelForDate}
-              sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} exTimer={exTimer}
+              sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} addExerciseSet={addExerciseSet} exTimer={exTimer}
               groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
               toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
               removeSession={removeSession}
