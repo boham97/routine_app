@@ -186,7 +186,7 @@ export default function TodoTab({
                       <button
                         onClick={() => addExerciseSet(session.id, ex.id)}
                         aria-label="세트 추가"
-                        style={{ width: '36px', height: '36px', borderRadius: '8px', border: 'none', background: '#34c759', color: '#fff', fontSize: '22px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+                        style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1.5px solid #c6c6c8', background: 'transparent', color: '#8e8e93', fontSize: '22px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
                       >+</button>
                     </div>
                   </div>
