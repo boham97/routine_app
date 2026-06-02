@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { MONTHS, DAYS, addDays } from '../constants.js'
+import { MONTHS, DAYS, addDays, dateKey } from '../constants.js'
 import { NavCard, NavBtn, EmptyCard } from './ui.jsx'
 import { circle, rateColor } from '../styles.js'
+import { useLocalState } from '../hooks/useLocalState.js'
 
 const scopeBtn = (color, outline) => ({
   height: '28px', padding: '0 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
@@ -13,16 +14,24 @@ const scopeBtn = (color, outline) => ({
 export default function TodoTab({
   selectedDate, setSelectedDate,
   labelForDate,
-  sessionsForDay, expandedSession, setExpandedSession, toggleSet, addExerciseSet, exTimer,
-  groupsForDay, expandedTodoGroup, setExpandedTodoGroup, toggleGroupItemCount, removeTodoGroup,
+  sessionsForDay, toggleSet, addExerciseSet, exTimer,
+  groupsForDay, toggleGroupItemCount, removeTodoGroup,
   removeSession,
   confirm, rate,
   availableWorkoutTpls, applyWorkoutTemplate,
   availableTodoTpls, applyTodoTemplate,
-  planTasksForDay, addPlanTask, removePlanTask, togglePlanTask,
 }) {
   const [showAdd,    setShowAdd]    = useState(false)
   const [taskInput,  setTaskInput]  = useState('')
+  const [expandedSession,   setExpandedSession]   = useState({})
+  const [expandedTodoGroup, setExpandedTodoGroup] = useState({})
+
+  const selKey = dateKey(selectedDate)
+  const [planTasks, setPlanTasks] = useLocalState('planTasks', [])
+  const planTasksForDay = planTasks.filter(t => t.date === selKey)
+  const addPlanTask    = text => setPlanTasks(p => [...p, { id: Date.now(), text: text.trim(), date: selKey, completed: false }])
+  const removePlanTask = id   => setPlanTasks(p => p.filter(t => t.id !== id))
+  const togglePlanTask = id   => setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
 
   function handleAddTask() {
     if (!taskInput.trim()) return

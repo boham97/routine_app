@@ -1,140 +1,71 @@
-import { useState, useEffect, useRef } from 'react'
-import { dateKey, addDays, getToday, load } from './constants.js'
+import { useState } from 'react'
+import { dateKey, addDays, getToday } from './constants.js'
+import { useLocalState } from './hooks/useLocalState.js'
+import { useWorkoutRunner } from './hooks/useWorkoutRunner.js'
 import TodoTab from './components/TodoTab.jsx'
 import RoutineTab from './components/RoutineTab.jsx'
 import StatsTab from './components/StatsTab.jsx'
 import FoodTab from './components/FoodTab.jsx'
 import { DrumWheelModal, ConfirmModal } from './components/Modals.jsx'
 
+const TABS = ['todo', 'routine', 'stats', 'food']
+
+const rate = (done, total) => total === 0 ? 0 : Math.round((done / total) * 100)
+
+function getMondayOfWeek(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
+  return dateKey(d)
+}
+
 export default function App() {
-  const TABS = ['todo', 'routine', 'stats', 'food']
-  const [tabIdx,   setTabIdx]   = useState(0)
+  const [tabIdx, setTabIdx] = useState(0)
   const tab = TABS[tabIdx]
-  function setTab(key) { setTabIdx(TABS.indexOf(key)) }
+  const setTab = key => setTabIdx(TABS.indexOf(key))
 
-  // ── 공통 날짜 ──────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(getToday())
-
-  // ── 개별 할일 ──────────────────────────────────────────────
-  const [todos,         setTodos]         = useState(() => load('todos', []))
-  const [todoInput,     setTodoInput]     = useState('')
-  const [showTodoInput, setShowTodoInput] = useState(false)
-
-  // ── 할일 그룹 (템플릿 기반, 반복횟수 지원) ─────────────────
-  const [todoTemplates,       setTodoTemplates]       = useState(() => load('todoTemplates', []))
-  const [todoGroups,          setTodoGroups]          = useState(() => load('todoGroups', []))
-  const [expandedTodoGroup,   setExpandedTodoGroup]   = useState({})
-
-  // ── 운동 루틴 ──────────────────────────────────────────────
-  const [workoutTemplates, setWorkoutTemplates] = useState(() => load('workoutTemplates', []))
-  const [workoutSessions,  setWorkoutSessions]  = useState(() => load('workoutSessions',  []))
-  const [expandedSession,  setExpandedSession]  = useState({})
-
-  // ── 루틴 탭 상태 ───────────────────────────────────────────
-  const [routineTab,        setRoutineTab]        = useState('workout')
-  const [showWorkoutForm,   setShowWorkoutForm]   = useState(false)
-  const [editingWorkoutId,  setEditingWorkoutId]  = useState(null)
-  const [wName,  setWName]  = useState('')
-  const [wExercises, setWExercises] = useState([])
-  const [exInput, setExInput] = useState('')
-  const [exSets,  setExSets]  = useState('3')
-  const [exReps,  setExReps]  = useState('10')
-  const [exUnit,  setExUnit]  = useState('회')
-  const exInputRef = useRef(null)
-
-  const [showTodoTplForm,  setShowTodoTplForm]  = useState(false)
-  const [editingTodoTplId, setEditingTodoTplId] = useState(null)
-  const [ttName,  setTtName]  = useState('')
-  const [ttItems, setTtItems] = useState([])
-  const [ttInput, setTtInput] = useState('')
-  const [ttCount, setTtCount] = useState('1')
-  const ttInputRef = useRef(null)
-
-  // ── 세트 실제 횟수 입력 ────────────────────────────────────
-  const [pendingSet, setPendingSet] = useState(null)
-  const [pendingReps, setPendingReps] = useState(0)
-  const [wheelOffset, setWheelOffset] = useState(0)
-  const dragStartY = useRef(null)
-  const dragStartVal = useRef(0)
-  const restTimerRef = useRef(null)
-  const [restSec, setRestSec] = useState(null)
-  const audioCtxRef = useRef(null)
-
-  // ── 초 단위 운동 타이머 ────────────────────────────────────
-  const exTimerIntervalRef = useRef(null)
-  const [exTimer, setExTimer] = useState(null) // { sessionId, exerciseId, setIdx, remaining, total }
-
-  function initAudioCtx() {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
-    } else if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume()
-    }
-  }
-
-  function playBeep() {
-    try {
-      const ctx = audioCtxRef.current
-      if (!ctx) return
-      const beep = (freq, start, dur) => {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain); gain.connect(ctx.destination)
-        osc.frequency.value = freq; osc.type = 'sine'
-        gain.gain.setValueAtTime(0.7, ctx.currentTime + start)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur)
-        osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur)
-      }
-      beep(880, 0, 0.15); beep(880, 0.2, 0.15); beep(1100, 0.4, 0.4)
-    } catch {}
-  }
-
-  // ── 통계 ───────────────────────────────────────────────────
-
-  // ── localStorage 동기화 ────────────────────────────────────
-  useEffect(() => { localStorage.setItem('todos',            JSON.stringify(todos))            }, [todos])
-  useEffect(() => { localStorage.setItem('todoTemplates',    JSON.stringify(todoTemplates))    }, [todoTemplates])
-  useEffect(() => { localStorage.setItem('todoGroups',       JSON.stringify(todoGroups))       }, [todoGroups])
-  useEffect(() => { localStorage.setItem('workoutTemplates', JSON.stringify(workoutTemplates)) }, [workoutTemplates])
-  useEffect(() => { localStorage.setItem('workoutSessions',  JSON.stringify(workoutSessions))  }, [workoutSessions])
-
-  // ── 날짜 helpers ───────────────────────────────────────────
+  const selKey = dateKey(selectedDate)
   const todayKey = dateKey(getToday())
-  const selKey   = dateKey(selectedDate)
-
-  function getMondayOfWeek(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00')
-    const day = d.getDay()
-    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-    return dateKey(d)
-  }
 
   const labelForDate = d => {
-    const key = dateKey(d)
-    if (key === todayKey) return '오늘'
-    if (key === dateKey(addDays(getToday(), -1))) return '어제'
-    if (key === dateKey(addDays(getToday(),  1))) return '내일'
+    const k = dateKey(d)
+    if (k === todayKey) return '오늘'
+    if (k === dateKey(addDays(getToday(), -1))) return '어제'
+    if (k === dateKey(addDays(getToday(),  1))) return '내일'
     return null
   }
 
-  // ── 태스크 CRUD ────────────────────────────────────────────
+  // ── 공유 영속 상태 (탭 간 공유 필요) ─────────────────────────
+  const [todos,            setTodos]            = useLocalState('todos', [])
+  const [todoTemplates,    setTodoTemplates]    = useLocalState('todoTemplates', [])
+  const [todoGroups,       setTodoGroups]       = useLocalState('todoGroups', [])
+  const [workoutTemplates, setWorkoutTemplates] = useLocalState('workoutTemplates', [])
+  const [workoutSessions,  setWorkoutSessions]  = useLocalState('workoutSessions', [])
+
+  // ── 운동 세션 실행 흐름 (타이머·드럼휠·휴식배너) ──────────────
+  const runner = useWorkoutRunner({ workoutSessions, setWorkoutSessions })
+
+  // ── 확인 모달 ─────────────────────────────────────────────────
+  const [modal, setModal] = useState({ show: false, message: '', onConfirm: null })
+  const confirm    = (message, onConfirm) => setModal({ show: true, message, onConfirm })
+  const closeModal = () => setModal({ show: false, message: '', onConfirm: null })
+
+  // ── 태스크(루틴 탭에서만 사용) ────────────────────────────────
   function addTask({ name, taskType, goalMode, sets, reps, seconds, desc }) {
-    const createdAt = getToday(); createdAt.setHours(12,0,0,0)
+    const createdAt = getToday(); createdAt.setHours(12, 0, 0, 0)
     const base = { id: Date.now(), text: name, completed: false, createdAt: createdAt.toISOString(), taskType, ...(desc ? { desc } : {}) }
     if (taskType === 'workout') {
-      base.goalMode = goalMode
-      if (goalMode === 'reps') {
-        const s = Math.max(1, parseInt(sets) || 4)
-        base.sets = s; base.reps = parseInt(reps) || 10
-        base.completedSets = Array(s).fill(false)
-      } else {
-        const s = Math.max(1, parseInt(sets) || 4)
-        base.sets = s; base.seconds = parseInt(seconds) || 60
-        base.completedSets = Array(s).fill(false)
-      }
+      const s = Math.max(1, parseInt(sets) || 4)
+      base.goalMode = goalMode; base.sets = s
+      if (goalMode === 'reps') base.reps    = parseInt(reps)    || 10
+      else                     base.seconds = parseInt(seconds) || 60
+      base.completedSets = Array(s).fill(false)
     }
     setTodos(p => [...p, base])
   }
+  const toggleTodo = id => setTodos(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
+  const deleteTodo = id => setTodos(p => p.filter(t => t.id !== id))
   function toggleTaskSet(taskId, setIdx) {
     setTodos(p => p.map(t => {
       if (t.id !== taskId) return t
@@ -142,76 +73,53 @@ export default function App() {
       return { ...t, completedSets: newSets, completed: newSets.every(Boolean) }
     }))
   }
-  function toggleTodo(id) {
-    setTodos(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
-  }
-  function deleteTodo(id) { setTodos(p => p.filter(t => t.id !== id)) }
   function updateTask(id, changes) {
     setTodos(p => p.map(t => {
       if (t.id !== id) return t
       const updated = { ...t, ...changes }
       if ('sets' in changes && t.taskType === 'workout') {
-        const newSets = Math.max(1, parseInt(changes.sets) || 1)
-        updated.sets = newSets
+        const n = Math.max(1, parseInt(changes.sets) || 1)
+        updated.sets = n
         const old = t.completedSets || []
-        updated.completedSets = Array(newSets).fill(false).map((_, i) => old[i] ?? false)
+        updated.completedSets = Array(n).fill(false).map((_, i) => old[i] ?? false)
       }
       return updated
     }))
   }
-  const todosForDay    = todos.filter(t => dateKey(t.createdAt) === selKey)
-  const tasksForToday  = todos.filter(t => dateKey(t.createdAt) === todayKey)
 
-  // ── 플랜 일회성 태스크 ─────────────────────────────────────
-  const [planTasks, setPlanTasks] = useState(() => load('planTasks', []))
-  useEffect(() => { localStorage.setItem('planTasks', JSON.stringify(planTasks)) }, [planTasks])
+  // ── 템플릿 적용 (오늘/이번주) ─────────────────────────────────
+  function applyTemplate(kind, tpl, scope) {
+    const collection      = kind === 'workout' ? workoutSessions : todoGroups
+    const setCollection   = kind === 'workout' ? setWorkoutSessions : setTodoGroups
+    const makeInstance = (date, id) => kind === 'workout'
+      ? { id, templateId: tpl.id, name: tpl.name, date,
+          exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) })) }
+      : { id, templateId: tpl.id, name: tpl.name, date,
+          items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) })) }
 
-  function addPlanTask(text, date) {
-    setPlanTasks(p => [...p, { id: Date.now(), text: text.trim(), date, completed: false }])
-  }
-  function removePlanTask(id) { setPlanTasks(p => p.filter(t => t.id !== id)) }
-  function togglePlanTask(id) { setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t)) }
-
-  const planTasksForDay = planTasks.filter(t => t.date === selKey)
-
-  // ── 식자재 관리 ────────────────────────────────────────────
-  const [foods, setFoods] = useState(() => load('foods', []))
-  useEffect(() => { localStorage.setItem('foods', JSON.stringify(foods)) }, [foods])
-  function addFood({ name, expiry, quantity, storage, decimal }) {
-    setFoods(p => [...p, { id: Date.now(), name, expiry, quantity, storage, decimal }])
-  }
-  function removeFood(id) { setFoods(p => p.filter(f => f.id !== id)) }
-  function updateFood(id, patch) { setFoods(p => p.map(f => f.id === id ? { ...f, ...patch } : f)) }
-
-  // ── 할일 그룹 CRUD ─────────────────────────────────────────
-  function applyTodoTemplate(tpl, scope = 'today') {
     if (scope === 'today') {
-      if (todoGroups.find(g => g.templateId === tpl.id && g.date === selKey)) return
-      const group = {
-        id: Date.now(), templateId: tpl.id, name: tpl.name, date: selKey,
-        items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) }))
-      }
-      setTodoGroups(p => [...p, group])
-      setExpandedTodoGroup(p => ({ ...p, [group.id]: true }))
+      if (collection.find(x => x.templateId === tpl.id && x.date === selKey)) return
+      setCollection(p => [...p, makeInstance(selKey, Date.now())])
     } else {
       const base = Date.now()
       const monday = new Date(getMondayOfWeek(selKey) + 'T00:00:00')
       const toAdd = []
       for (let i = 0; i < 7; i++) {
         const dKey = dateKey(addDays(monday, i))
-        if (!todoGroups.find(g => g.templateId === tpl.id && g.date === dKey)) {
-          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, date: dKey, isWeekly: true,
-            items: tpl.items.map(item => ({ ...item, completedCounts: Array(item.count).fill(false) })) })
+        if (!collection.find(x => x.templateId === tpl.id && x.date === dKey)) {
+          const inst = makeInstance(dKey, base + i)
+          inst.isWeekly = true
+          toAdd.push(inst)
         }
       }
-      if (toAdd.length > 0) {
-        setTodoGroups(p => [...p, ...toAdd])
-        const exp = {}; toAdd.forEach(g => { exp[g.id] = true })
-        setExpandedTodoGroup(p => ({ ...p, ...exp }))
-      }
+      if (toAdd.length > 0) setCollection(p => [...p, ...toAdd])
     }
   }
-  function removeTodoGroup(id) { setTodoGroups(p => p.filter(g => g.id !== id)) }
+  const applyWorkoutTemplate = (tpl, scope = 'today') => applyTemplate('workout', tpl, scope)
+  const applyTodoTemplate    = (tpl, scope = 'today') => applyTemplate('todo',    tpl, scope)
+
+  // ── 할일 그룹 ────────────────────────────────────────────────
+  const removeTodoGroup = id => setTodoGroups(p => p.filter(g => g.id !== id))
   function toggleGroupItemCount(groupId, itemId, idx) {
     setTodoGroups(p => p.map(g => g.id !== groupId ? g : {
       ...g, items: g.items.map(item => item.id !== itemId ? item : {
@@ -220,316 +128,100 @@ export default function App() {
     }))
   }
 
-  const groupsForDay           = todoGroups.filter(g => g.date === selKey)
-  const appliedTodoTplIds      = groupsForDay.map(g => g.templateId)
-  const availableTodoTemplates = todoTemplates.filter(t => !appliedTodoTplIds.includes(t.id))
-
-  // exTimer: elapsed가 total에 도달하면 알림음만 (완료는 탭으로)
-  useEffect(() => {
-    if (exTimer?.elapsed !== exTimer?.total) return
-    playBeep()
-  }, [exTimer])
-
-  // ── 운동 CRUD ──────────────────────────────────────────────
-  function applyWorkoutTemplate(tpl, scope = 'today') {
-    if (scope === 'today') {
-      if (workoutSessions.find(s => s.templateId === tpl.id && s.date === selKey)) return
-      const session = {
-        id: Date.now(), templateId: tpl.id, name: tpl.name, date: selKey,
-        exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) }))
-      }
-      setWorkoutSessions(p => [...p, session])
-      setExpandedSession(p => ({ ...p, [session.id]: true }))
-    } else {
-      const base = Date.now()
-      const monday = new Date(getMondayOfWeek(selKey) + 'T00:00:00')
-      const toAdd = []
-      for (let i = 0; i < 7; i++) {
-        const dKey = dateKey(addDays(monday, i))
-        if (!workoutSessions.find(s => s.templateId === tpl.id && s.date === dKey)) {
-          toAdd.push({ id: base + i, templateId: tpl.id, name: tpl.name, date: dKey, isWeekly: true,
-            exercises: tpl.exercises.map(e => ({ ...e, completedSets: Array(e.sets).fill(false) })) })
-        }
-      }
-      if (toAdd.length > 0) {
-        setWorkoutSessions(p => [...p, ...toAdd])
-        const exp = {}; toAdd.forEach(s => { exp[s.id] = true })
-        setExpandedSession(p => ({ ...p, ...exp }))
-      }
-    }
-  }
-  function removeSession(id) {
-    if (exTimer?.sessionId === id) { clearInterval(exTimerIntervalRef.current); setExTimer(null) }
-    setWorkoutSessions(p => p.filter(s => s.id !== id))
-  }
-  function addExerciseSet(sessionId, exerciseId) {
-    setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
-      ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
-        ...e, sets: (e.sets || 0) + 1, completedSets: [...(e.completedSets || []), false],
-      })
-    }))
-  }
-  function toggleSet(sessionId, exerciseId, setIdx) {
-    const session = workoutSessions.find(s => s.id === sessionId)
-    const ex = session?.exercises.find(e => e.id === exerciseId)
-    const cur = ex?.completedSets?.[setIdx] ?? false
-
-    // 이 세트의 타이머가 돌고 있으면 실제 경과 시간으로 기록
-    if (exTimer && exTimer.sessionId === sessionId && exTimer.exerciseId === exerciseId && exTimer.setIdx === setIdx) {
-      clearInterval(exTimerIntervalRef.current)
-      const actual = exTimer.elapsed
-      setExTimer(null)
-      setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
-        ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
-          ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
-            i === setIdx ? actual : (e.completedSets?.[i] ?? false)
-          )
-        })
-      }))
-      initAudioCtx()
-      if (restTimerRef.current) clearInterval(restTimerRef.current)
-      setRestSec(60)
-      restTimerRef.current = setInterval(() => {
-        setRestSec(prev => {
-          if (prev <= 1) { clearInterval(restTimerRef.current); restTimerRef.current = null; playBeep(); return null }
-          return prev - 1
-        })
-      }, 1000)
-      return
-    }
-
-    if (cur !== false) {
-      setWorkoutSessions(p => p.map(s => s.id !== sessionId ? s : {
-        ...s, exercises: s.exercises.map(e => e.id !== exerciseId ? e : {
-          ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
-            i === setIdx ? false : (e.completedSets?.[i] ?? false)
-          )
-        })
-      }))
-    } else if (ex?.unit === '초') {
-      // 초 단위: 카운트다운 타이머 시작
-      initAudioCtx()
-      clearInterval(exTimerIntervalRef.current)
-      const total = ex.reps
-      setExTimer({ sessionId, exerciseId, setIdx, elapsed: 0, total })
-      exTimerIntervalRef.current = setInterval(() => {
-        setExTimer(prev => {
-          if (!prev) { clearInterval(exTimerIntervalRef.current); return null }
-          return { ...prev, elapsed: prev.elapsed + 1 }
-        })
-      }, 1000)
-    } else {
-      setPendingSet({ sessionId, exerciseId, setIdx, plannedReps: ex?.reps ?? 0, unit: ex?.unit ?? '회' })
-      setPendingReps(ex?.reps ?? 0)
-    }
-  }
-  function confirmSet() {
-    const reps = pendingReps > 0 ? pendingReps : pendingSet.plannedReps
-    setWorkoutSessions(p => p.map(s => s.id !== pendingSet.sessionId ? s : {
-      ...s, exercises: s.exercises.map(e => e.id !== pendingSet.exerciseId ? e : {
-        ...e, completedSets: Array.from({length: e.sets}, (_, i) =>
-          i === pendingSet.setIdx ? reps : (e.completedSets?.[i] ?? false)
-        )
-      })
-    }))
-    setPendingSet(null)
-    // 1분 휴식 타이머 (iOS용: 유저 터치 시점에 AudioContext 초기화)
-    initAudioCtx()
-    if (restTimerRef.current) clearInterval(restTimerRef.current)
-    setRestSec(60)
-    restTimerRef.current = setInterval(() => {
-      setRestSec(prev => {
-        if (prev <= 1) {
-          clearInterval(restTimerRef.current)
-          restTimerRef.current = null
-          playBeep()
-          return null
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  const sessionsForDay     = workoutSessions.filter(s => s.date === selKey)
-  const appliedTemplateIds = sessionsForDay.map(s => s.templateId)
-  const availableTemplates = workoutTemplates.filter(t => !appliedTemplateIds.includes(t.id))
-
-  // ── 운동 루틴 템플릿 CRUD ──────────────────────────────────
-  function openAddWorkout() {
-    setEditingWorkoutId(null); setWName(''); setWExercises([])
-    setExInput(''); setExSets('3'); setExReps('10'); setExUnit('회')
-    setShowWorkoutForm(true)
-  }
-  function openEditWorkout(tpl) {
-    setEditingWorkoutId(tpl.id); setWName(tpl.name); setWExercises([...tpl.exercises])
-    setExInput(''); setExSets('3'); setExReps('10'); setExUnit('회')
-    setShowWorkoutForm(true)
-  }
-  function addExercise() {
-    const name = exInput.trim(); if (!name) return
-    setWExercises(p => [...p, { id: Date.now(), name, sets: parseInt(exSets)||3, reps: parseInt(exReps)||10, unit: exUnit }])
-    setExInput(''); setExSets('3'); setExReps('10'); setExUnit('회')
-    setTimeout(() => exInputRef.current?.focus(), 50)
-  }
-  function removeExercise(id) { setWExercises(p => p.filter(e => e.id !== id)) }
-  function saveWorkoutTpl() {
-    if (!wName.trim() || wExercises.length === 0) return
-    if (editingWorkoutId) {
-      setWorkoutTemplates(p => p.map(t => t.id === editingWorkoutId
-        ? { ...t, name: wName.trim(), exercises: [...wExercises] } : t))
-    } else {
-      setWorkoutTemplates(p => [...p, { id: Date.now(), name: wName.trim(), exercises: [...wExercises] }])
-    }
-    setShowWorkoutForm(false); setEditingWorkoutId(null)
-  }
+  // ── 템플릿 CRUD (루틴 탭) ────────────────────────────────────
+  const addWorkoutGroup    = (name, exercises) => setWorkoutTemplates(p => [...p, { id: Date.now(), name: name.trim(), exercises }])
+  const updateWorkoutGroup = (id, changes)     => setWorkoutTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
   function deleteWorkoutTpl(id) {
     setWorkoutTemplates(p => p.filter(t => t.id !== id))
     setWorkoutSessions(p => p.filter(s => s.templateId !== id))
   }
-
-  // ── 할일 그룹 템플릿 CRUD ──────────────────────────────────
-  function openAddTodoTpl() {
-    setEditingTodoTplId(null); setTtName(''); setTtItems([])
-    setTtInput(''); setTtCount('1'); setShowTodoTplForm(true)
-  }
-  function openEditTodoTpl(tpl) {
-    setEditingTodoTplId(tpl.id); setTtName(tpl.name); setTtItems([...tpl.items])
-    setTtInput(''); setTtCount('1'); setShowTodoTplForm(true)
-  }
-  function addTtItem() {
-    const text = ttInput.trim(); if (!text) return
-    setTtItems(p => [...p, { id: Date.now(), text, count: parseInt(ttCount)||1 }])
-    setTtInput(''); setTtCount('1')
-    setTimeout(() => ttInputRef.current?.focus(), 50)
-  }
-  function removeTtItem(id) { setTtItems(p => p.filter(x => x.id !== id)) }
-  function saveTodoTpl() {
-    if (!ttName.trim() || ttItems.length === 0) return
-    if (editingTodoTplId) {
-      setTodoTemplates(p => p.map(t => t.id === editingTodoTplId
-        ? { ...t, name: ttName.trim(), items: [...ttItems] } : t))
-      setTodoGroups(p => p.map(g => g.templateId === editingTodoTplId
-        ? { ...g, name: ttName.trim() } : g))
-    } else {
-      setTodoTemplates(p => [...p, { id: Date.now(), name: ttName.trim(), items: [...ttItems] }])
-    }
-    setShowTodoTplForm(false); setEditingTodoTplId(null)
-  }
+  const addGeneralGroup    = (name, items)  => setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), items }])
+  const updateGeneralGroup = (id, changes)  => setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
   function deleteTodoTpl(id) {
     setTodoTemplates(p => p.filter(t => t.id !== id))
     setTodoGroups(p => p.filter(g => g.templateId !== id))
   }
 
-  // ── 그룹 간편 추가 (RoutineTab용) ─────────────────────────
-  function addWorkoutGroup(name, exercises) {
-    setWorkoutTemplates(p => [...p, { id: Date.now(), name: name.trim(), exercises }])
-  }
-  function updateWorkoutGroup(id, changes) {
-    setWorkoutTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
-  }
-  function addGeneralGroup(name, items) {
-    setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), items }])
-  }
-  function updateGeneralGroup(id, changes) {
-    setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
-  }
-
-  // ── 확인 모달 ──────────────────────────────────────────────
-  const [modal, setModal] = useState({ show: false, message: '', onConfirm: null })
-  function confirm(message, onConfirm) { setModal({ show: true, message, onConfirm }) }
-  function closeModal() { setModal({ show: false, message: '', onConfirm: null }) }
-
-  // ── 통계 helpers ───────────────────────────────────────────
-  const rate = (done, total) => total===0 ? 0 : Math.round((done/total)*100)
+  // ── 날짜 필터 ────────────────────────────────────────────────
+  const sessionsForDay         = workoutSessions.filter(s => s.date === selKey)
+  const groupsForDay           = todoGroups.filter(g => g.date === selKey)
+  const availableWorkoutTpls   = workoutTemplates.filter(t => !sessionsForDay.some(s => s.templateId === t.id))
+  const availableTodoTpls      = todoTemplates.filter(t => !groupsForDay.some(g => g.templateId === t.id))
 
   return (
     <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
 
-      {/* 휴식 타이머 */}
-      {restSec !== null && (
-        <div style={{ background: restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flex:'0 0 auto' }}>
-          휴식 {restSec}초 남음
+      {/* 휴식 타이머 배너 */}
+      {runner.restSec !== null && (
+        <div style={{ background: runner.restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flex:'0 0 auto' }}>
+          휴식 {runner.restSec}초 남음
         </div>
       )}
 
-      {/* Content — 슬라이딩 탭 컨테이너 */}
+      {/* 슬라이딩 탭 컨테이너 */}
       <div style={{ flex:1, minHeight:0, overflow:'hidden', position:'relative' }}>
         <div style={{
-          display: 'flex',
-          width: '400%',
-          height: '100%',
-          transform: `translateX(${-tabIdx * (100/4)}%)`,
+          display: 'flex', width: '400%', height: '100%',
+          transform: `translateX(${-tabIdx * 25}%)`,
           transition: 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           willChange: 'transform',
         }}>
 
-          {/* 플랜 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <TodoTab
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               labelForDate={labelForDate}
-              sessionsForDay={sessionsForDay} expandedSession={expandedSession} setExpandedSession={setExpandedSession} toggleSet={toggleSet} addExerciseSet={addExerciseSet} exTimer={exTimer}
-              groupsForDay={groupsForDay} expandedTodoGroup={expandedTodoGroup} setExpandedTodoGroup={setExpandedTodoGroup}
+              sessionsForDay={sessionsForDay}
+              toggleSet={runner.toggleSet} addExerciseSet={runner.addExerciseSet} removeSession={runner.removeSession}
+              exTimer={runner.exTimer}
+              groupsForDay={groupsForDay}
               toggleGroupItemCount={toggleGroupItemCount} removeTodoGroup={removeTodoGroup}
-              removeSession={removeSession}
               confirm={confirm} rate={rate}
-              availableWorkoutTpls={availableTemplates} applyWorkoutTemplate={applyWorkoutTemplate}
-              availableTodoTpls={availableTodoTemplates} applyTodoTemplate={applyTodoTemplate}
-              planTasksForDay={planTasksForDay}
-              addPlanTask={text => addPlanTask(text, selKey)}
-              removePlanTask={removePlanTask} togglePlanTask={togglePlanTask}
+              availableWorkoutTpls={availableWorkoutTpls} applyWorkoutTemplate={applyWorkoutTemplate}
+              availableTodoTpls={availableTodoTpls}       applyTodoTemplate={applyTodoTemplate}
             />
           </div>
 
-          {/* 루틴 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
             <RoutineTab
               addTask={addTask} tasks={todos}
               toggleTaskSet={toggleTaskSet}
               deleteTodo={deleteTodo} updateTask={updateTask} confirm={confirm} rate={rate}
               workoutTemplates={workoutTemplates} addWorkoutGroup={addWorkoutGroup} updateWorkoutGroup={updateWorkoutGroup} deleteWorkoutTpl={deleteWorkoutTpl}
-              todoTemplates={todoTemplates} addGeneralGroup={addGeneralGroup} updateGeneralGroup={updateGeneralGroup} deleteTodoTpl={deleteTodoTpl}
+              todoTemplates={todoTemplates}       addGeneralGroup={addGeneralGroup} updateGeneralGroup={updateGeneralGroup} deleteTodoTpl={deleteTodoTpl}
             />
           </div>
 
-          {/* 통계 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
-            <StatsTab
-              workoutSessions={workoutSessions}
-              todoGroups={todoGroups}
-              rate={rate}
-            />
+            <StatsTab workoutSessions={workoutSessions} todoGroups={todoGroups} rate={rate} />
           </div>
 
-          {/* 식자재 탭 */}
           <div style={{ width:'25%', flexShrink:0, display:'flex', flexDirection:'column', minHeight:0 }}>
-            <FoodTab foods={foods} addFood={addFood} removeFood={removeFood} updateFood={updateFood} confirm={confirm} />
+            <FoodTab confirm={confirm} />
           </div>
 
         </div>
       </div>
 
-      {/* 드럼휠 모달 */}
       <DrumWheelModal
-        pendingSet={pendingSet} setPendingSet={setPendingSet}
-        pendingReps={pendingReps} setPendingReps={setPendingReps}
-        wheelOffset={wheelOffset} setWheelOffset={setWheelOffset}
-        dragStartY={dragStartY} dragStartVal={dragStartVal}
-        confirmSet={confirmSet}
+        pendingSet={runner.pendingSet}
+        pendingReps={runner.pendingReps}
+        setPendingReps={runner.setPendingReps}
+        onCancel={runner.cancelPending}
+        onConfirm={runner.confirmSet}
       />
 
-      {/* 확인 모달 */}
       <ConfirmModal modal={modal} closeModal={closeModal} />
 
-      {/* Tab Bar */}
+      {/* 탭바 */}
       <div style={{ height:'72px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
         {[
-          { key:'todo',    label:'플랜', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
-          { key:'routine', label:'루틴',  icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="19" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="5" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="17" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="7" y="10" width="10" height="4" rx="2" fill="currentColor"/></svg> },
-          { key:'stats',   label:'통계',  icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="4" height="7" rx="1" fill="currentColor"/><rect x="10" y="9" width="4" height="11" rx="1" fill="currentColor"/><rect x="16" y="5" width="4" height="15" rx="1" fill="currentColor"/></svg> },
+          { key:'todo',    label:'플랜',   icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="11" width="16" height="2.5" rx="1.25" fill="currentColor"/><rect x="4" y="17" width="10" height="2.5" rx="1.25" fill="currentColor"/></svg> },
+          { key:'routine', label:'루틴',   icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="19" y="11" width="3" height="2" rx="1" fill="currentColor"/><rect x="5" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="17" y="8" width="2" height="8" rx="1" fill="currentColor"/><rect x="7" y="10" width="10" height="4" rx="2" fill="currentColor"/></svg> },
+          { key:'stats',   label:'통계',   icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="13" width="4" height="7" rx="1" fill="currentColor"/><rect x="10" y="9" width="4" height="11" rx="1" fill="currentColor"/><rect x="16" y="5" width="4" height="15" rx="1" fill="currentColor"/></svg> },
           { key:'food',    label:'식자재', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="2"/><line x1="6" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="2"/><line x1="9" y1="6" x2="9" y2="7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="9" y1="13" x2="9" y2="14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> },
         ].map(t => (
-          <button key={t.key} onClick={()=>setTab(t.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', background:'none', border:'none', cursor:'pointer', color: tab===t.key?'#007aff':'#8e8e93' }}>
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', background:'none', border:'none', cursor:'pointer', color: tab === t.key ? '#007aff' : '#8e8e93' }}>
             {t.icon}
             <span style={{ fontSize:'12px', fontWeight:'600' }}>{t.label}</span>
           </button>

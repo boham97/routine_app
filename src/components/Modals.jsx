@@ -1,8 +1,15 @@
-const ITEM_H = 52
+import { useRef, useState } from 'react'
 
-export function DrumWheelModal({ pendingSet, setPendingSet, pendingReps, setPendingReps, wheelOffset, setWheelOffset, dragStartY, dragStartVal, confirmSet }) {
+const ITEM_H = 52
+const HALF = 2
+
+export function DrumWheelModal({ pendingSet, pendingReps, setPendingReps, onCancel, onConfirm }) {
+  const [wheelOffset, setWheelOffset] = useState(0)
+  const dragStartY   = useRef(null)
+  const dragStartVal = useRef(0)
+
   if (!pendingSet) return null
-  const HALF = 2
+
   const onMove = (clientY) => {
     if (dragStartY.current === null) return
     const rawDelta = dragStartY.current - clientY
@@ -12,6 +19,7 @@ export function DrumWheelModal({ pendingSet, setPendingSet, pendingReps, setPend
     setWheelOffset((floatVal - intVal) * ITEM_H)
   }
   const onEnd = () => { dragStartY.current = null; setWheelOffset(0) }
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
       onMouseMove={e=>onMove(e.clientY)} onMouseUp={onEnd}
@@ -20,15 +28,12 @@ export function DrumWheelModal({ pendingSet, setPendingSet, pendingReps, setPend
       <div style={{ background:'#fff', borderRadius:'14px', width:'260px', overflow:'hidden' }}>
         <div style={{ padding:'16px 16px 8px', textAlign:'center' }}>
           <div style={{ fontSize:'13px', color:'#8e8e93', marginBottom:'8px' }}>{pendingSet.setIdx+1}세트 실제 수행 횟수</div>
-          {/* 드럼 휠 */}
           <div
             onMouseDown={e=>{ dragStartY.current=e.clientY; dragStartVal.current=pendingReps }}
             onTouchStart={e=>{ dragStartY.current=e.touches[0].clientY; dragStartVal.current=pendingReps }}
             style={{ cursor:'ns-resize', userSelect:'none', touchAction:'none', position:'relative', height: ITEM_H*(HALF*2+1), overflow:'hidden' }}
           >
-            {/* 선택 강조 바 */}
             <div style={{ position:'absolute', top: HALF*ITEM_H, left:16, right:16, height:ITEM_H, background:'#f2f2f7', borderRadius:'10px', pointerEvents:'none' }}/>
-            {/* 숫자 목록 */}
             <div style={{ transform:`translateY(${-wheelOffset - 2*ITEM_H}px)`, transition: dragStartY.current ? 'none' : 'transform 0.15s ease' }}>
               {Array.from({length: HALF*2+1+4}, (_, i) => {
                 const val = pendingReps - HALF - 2 + i
@@ -50,8 +55,8 @@ export function DrumWheelModal({ pendingSet, setPendingSet, pendingReps, setPend
           </div>
         </div>
         <div style={{ borderTop:'0.5px solid #e5e5ea', display:'flex', marginTop:'8px' }}>
-          <button onClick={()=>{ setPendingSet(null); setWheelOffset(0) }} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', color:'#8e8e93', cursor:'pointer', borderRight:'0.5px solid #e5e5ea' }}>취소</button>
-          <button onClick={confirmSet} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', fontWeight:'700', color:'#007aff', cursor:'pointer' }}>완료</button>
+          <button onClick={onCancel} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', color:'#8e8e93', cursor:'pointer', borderRight:'0.5px solid #e5e5ea' }}>취소</button>
+          <button onClick={onConfirm} style={{ flex:1, padding:'14px', background:'none', border:'none', fontSize:'15px', fontWeight:'700', color:'#007aff', cursor:'pointer' }}>완료</button>
         </div>
       </div>
     </div>

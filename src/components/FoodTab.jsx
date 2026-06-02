@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { getToday, dateKey, MONTHS, DAYS } from '../constants.js'
 import { EmptyCard, useHold } from './ui.jsx'
+import { useLocalState } from '../hooks/useLocalState.js'
 
 // 한 달치 날짜 그리드 (항상 6줄 = 42칸, 앞뒤로 인접 달 날짜를 이어서 채우되 연하게)
 function MonthGrid({ y, m, value, onChange }) {
@@ -286,7 +287,12 @@ function NumberWheel({ value, max, min = 0, onChange, width = '100%' }) {
   )
 }
 
-export default function FoodTab({ foods, addFood, removeFood, updateFood, confirm }) {
+export default function FoodTab({ confirm }) {
+  const [foods, setFoods] = useLocalState('foods', [])
+  const addFood    = food         => setFoods(p => [...p, { id: Date.now(), ...food }])
+  const removeFood = id           => setFoods(p => p.filter(f => f.id !== id))
+  const updateFood = (id, patch)  => setFoods(p => p.map(f => f.id === id ? { ...f, ...patch } : f))
+
   const [name,   setName]   = useState('')
   const [expRaw, setExpRaw] = useState('')   // 숫자만 최대 8자리 (YYYYMMDD)
   const [qty,    setQty]    = useState('')
