@@ -30,7 +30,7 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
       setRestSec(prev => {
         if (prev <= 1) {
           clearInterval(restRef.current); restRef.current = null
-          beep.play()
+          beep.playLong()
           return null
         }
         return prev - 1

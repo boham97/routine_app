@@ -33,7 +33,7 @@ export default function App() {
   const availableTodoTpls    = todoGroups.todoTemplates.filter(t => !groupsForDay.some(g => g.templateId === t.id))
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, paddingBottom:'20vh', background:'#f2f2f7' }}>
+    <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
 
       {runner.restSec !== null && (
         <div style={{ background: runner.restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flex:'0 0 auto' }}>
@@ -113,7 +113,7 @@ function TabBar({ tab, setTab }) {
     { key:'food',    label:'식자재', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="2.5" stroke="currentColor" strokeWidth="2"/><line x1="6" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="2"/><line x1="9" y1="6" x2="9" y2="7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><line x1="9" y1="13" x2="9" y2="14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> },
   ]
   return (
-    <div style={{ height:'72px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
+    <div style={{ height:'86px', flexShrink:0, background:'rgba(242,242,247,0.95)', borderTop:'0.5px solid #c6c6c8', display:'flex', alignItems:'center' }}>
       {items.map(t => (
         <button key={t.key} onClick={() => setTab(t.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', background:'none', border:'none', cursor:'pointer', color: tab === t.key ? '#007aff' : '#8e8e93' }}>
           {t.icon}

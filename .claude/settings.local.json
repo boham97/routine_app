@@ -15,7 +15,9 @@
       "Bash(cmd /c \"dir /a C:\\\\Users\\\\bosung\\\\Desktop\\\\todo\")",
       "Bash(git commit:*)",
       "Bash(del \"C:\\\\Users\\\\bosung\\\\Desktop\\\\routine_app\\\\App.js\")",
-      "Bash(powershell.exe -Command \"Remove-Item ''C:\\\\Users\\\\bosung\\\\Desktop\\\\routine_app\\\\App.js''\")"
+      "Bash(powershell.exe -Command \"Remove-Item ''C:\\\\Users\\\\bosung\\\\Desktop\\\\routine_app\\\\App.js''\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npx vercel *)"
     ]
   }
 }
