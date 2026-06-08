@@ -33,7 +33,7 @@ export default function App() {
   const availableTodoTpls    = todoGroups.todoTemplates.filter(t => !groupsForDay.some(g => g.templateId === t.id))
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, background:'#f2f2f7' }}>
+    <div style={{ display:'flex', flexDirection:'column', position:'fixed', inset:0, paddingBottom:'20vh', background:'#f2f2f7' }}>
 
       {runner.restSec !== null && (
         <div style={{ background: runner.restSec <= 10 ? '#ff3b30' : '#34c759', color:'#fff', textAlign:'center', padding:'6px', fontSize:'14px', fontWeight:'600', flex:'0 0 auto' }}>
