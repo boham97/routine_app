@@ -1,4 +1,4 @@
-import { dateKey, addDays } from '../constants.js'
+import { dateKey, addDays, getToday } from '../constants.js'
 import { getMondayOfWeek } from '../utils/date.js'
 import { useLocalState } from './useLocalState.js'
 
@@ -7,7 +7,27 @@ export function useTodoGroupData() {
   const [todoGroups,    setTodoGroups]    = useLocalState('todoGroups',    [])
 
   const addGeneralGroup    = (name, items)  => setTodoTemplates(p => [...p, { id: Date.now(), name: name.trim(), items }])
-  const updateGeneralGroup = (id, changes)  => setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
+  function updateGeneralGroup(id, changes) {
+    setTodoTemplates(p => p.map(t => t.id === id ? { ...t, ...changes } : t))
+    const today = dateKey(getToday())
+    setTodoGroups(p => p.map(g => {
+      if (g.templateId !== id || g.date < today) return g
+      const next = { ...g }
+      if (changes.name !== undefined) next.name = changes.name
+      if (changes.items !== undefined) {
+        next.items = changes.items.map(item => {
+          const prev = g.items.find(x => x.id === item.id)
+          const completedCounts = Array(item.count).fill(false)
+          if (prev) {
+            const n = Math.min(prev.completedCounts.length, item.count)
+            for (let i = 0; i < n; i++) completedCounts[i] = prev.completedCounts[i]
+          }
+          return { ...item, completedCounts }
+        })
+      }
+      return next
+    }))
+  }
 
   function deleteTodoTpl(id) {
     setTodoTemplates(p => p.filter(t => t.id !== id))

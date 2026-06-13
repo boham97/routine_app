@@ -127,6 +127,7 @@ export default function StatsTab({
 
   // ── 주간 운동 ─────────────────────────────────────────────────
   const sessionsWeek = (workoutSessions||[]).filter(s => weekDates.includes(s.date))
+  const workoutDaysWeek = new Set(sessionsWeek.map(s => s.date)).size
   const allSetsWeek  = sessionsWeek.flatMap(s => s.exercises.flatMap(e => e.completedSets))
   const doneSetsWeek = allSetsWeek.filter(Boolean)
   const exWeekMap = {}
@@ -160,6 +161,7 @@ export default function StatsTab({
 
   // ── 월간 운동 ─────────────────────────────────────────────────
   const sessionsVM = (workoutSessions||[]).filter(s => { const d=new Date(s.date); return d.getFullYear()===viewYear&&d.getMonth()===viewMonth })
+  const workoutDaysVM = new Set(sessionsVM.map(s => s.date)).size
   const allSetsVM  = sessionsVM.flatMap(s=>s.exercises.flatMap(e=>e.completedSets))
   const doneSetsVM = allSetsVM.filter(Boolean)
   const exMap = {}
@@ -237,7 +239,7 @@ export default function StatsTab({
                 style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>🏋️ 운동</div>
                 <div style={{ display:'flex', gap:'8px' }}>
-                  <StatCard label="운동일"   value={sessionsWeek.length}  color="#007aff"/>
+                  <StatCard label="운동일"   value={workoutDaysWeek}  color="#007aff"/>
                   <StatCard label="완료세트" value={doneSetsWeek.length}  color="#34c759"/>
                   <StatCard label="달성률"   value={`${rate(doneSetsWeek.length,allSetsWeek.length)}%`} color={rateColor(doneSetsWeek.length,allSetsWeek.length)}/>
                 </div>
@@ -268,7 +270,7 @@ export default function StatsTab({
                 style={{ padding:'14px 16px', cursor:'pointer', userSelect:'none', WebkitTapHighlightColor:'transparent' }}>
                 <div style={{ fontSize:'13px', color:'#8e8e93', fontWeight:'600', marginBottom:'10px' }}>🏋️ 운동</div>
                 <div style={{ display:'flex', gap:'8px' }}>
-                  <StatCard label="운동일"   value={sessionsVM.length}  color="#007aff"/>
+                  <StatCard label="운동일"   value={workoutDaysVM}  color="#007aff"/>
                   <StatCard label="완료세트" value={doneSetsVM.length}  color="#34c759"/>
                   <StatCard label="달성률"   value={`${rate(doneSetsVM.length,allSetsVM.length)}%`} color={rateColor(doneSetsVM.length,allSetsVM.length)}/>
                 </div>
