@@ -17,20 +17,91 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
   const [exTimer, setExTimer] = useState(null)
   const exRef = useRef(null)
 
-  // 운동 타이머가 목표시간 도달하면 알림음
+  // 타바타: 자동으로 진행 중인 운동. { sessionId, exerciseId }
+  const [tabataRun, setTabataRun] = useState(null)
+  const tabataStopRef = useRef(false)
+
+  // 운동 타이머가 목표시간 도달하면 알림음 (타바타 자동 진행 중에는 runTabataWork가 직접 처리)
   useEffect(() => {
-    if (exTimer && exTimer.elapsed === exTimer.total) beep.play()
+    if (!tabataRun && exTimer && exTimer.elapsed === exTimer.total) beep.play()
   }, [exTimer]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function startRestTimer() {
+  function startRestTimer(sec = 60) {
     beep.init()
     if (restRef.current) clearInterval(restRef.current)
-    setRestSec(60)
+    setRestSec(sec)
     restRef.current = setInterval(() => {
       setRestSec(prev => {
         if (prev <= 1) {
           clearInterval(restRef.current); restRef.current = null
           beep.playLong()
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  function getEx(sessionId, exerciseId) {
+    const session = workoutSessions.find(s => s.id === sessionId)
+    return session?.exercises.find(e => e.id === exerciseId)
+  }
+
+  function stopTabata() {
+    tabataStopRef.current = true
+    if (exRef.current)   { clearInterval(exRef.current);   exRef.current = null }
+    if (restRef.current) { clearInterval(restRef.current); restRef.current = null }
+    setExTimer(null); setRestSec(null); setTabataRun(null)
+  }
+
+  function startTabata(sessionId, exerciseId) {
+    const ex = getEx(sessionId, exerciseId)
+    if (!ex) return
+    const startIdx = (ex.completedSets || []).findIndex(v => v === false)
+    if (startIdx === -1) return
+    beep.init()
+    tabataStopRef.current = false
+    setTabataRun({ sessionId, exerciseId })
+    runTabataWork(sessionId, exerciseId, startIdx)
+  }
+
+  function runTabataWork(sessionId, exerciseId, setIdx) {
+    if (tabataStopRef.current) return
+    const ex = getEx(sessionId, exerciseId)
+    if (!ex) { setTabataRun(null); return }
+    clearInterval(exRef.current)
+    let elapsed = 0
+    const total = ex.reps
+    setExTimer({ sessionId, exerciseId, setIdx, elapsed, total })
+    exRef.current = setInterval(() => {
+      elapsed += 1
+      if (elapsed >= total) {
+        clearInterval(exRef.current); exRef.current = null
+        beep.play()
+        setExTimer(null)
+        setExerciseSet(sessionId, exerciseId, setIdx, total)
+        const nextIdx = setIdx + 1
+        if (tabataStopRef.current || nextIdx >= ex.sets) {
+          setTabataRun(null)
+        } else {
+          runTabataRest(sessionId, exerciseId, nextIdx, ex.restSec || 20)
+        }
+      } else {
+        setExTimer({ sessionId, exerciseId, setIdx, elapsed, total })
+      }
+    }, 1000)
+  }
+
+  function runTabataRest(sessionId, exerciseId, nextIdx, restDur) {
+    if (tabataStopRef.current) return
+    clearInterval(restRef.current)
+    setRestSec(restDur)
+    restRef.current = setInterval(() => {
+      setRestSec(prev => {
+        if (prev <= 1) {
+          clearInterval(restRef.current); restRef.current = null
+          beep.playLong()
+          if (!tabataStopRef.current) runTabataWork(sessionId, exerciseId, nextIdx)
           return null
         }
         return prev - 1
@@ -49,6 +120,7 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
   }
 
   function toggleSet(sessionId, exerciseId, setIdx) {
+    if (tabataRun && tabataRun.sessionId === sessionId && tabataRun.exerciseId === exerciseId) return
     const session = workoutSessions.find(s => s.id === sessionId)
     const ex = session?.exercises.find(e => e.id === exerciseId)
     const cur = ex?.completedSets?.[setIdx] ?? false
@@ -104,6 +176,7 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
   }
 
   function removeSession(id) {
+    if (tabataRun?.sessionId === id) stopTabata()
     if (exTimer?.sessionId === id) { clearInterval(exRef.current); setExTimer(null) }
     setWorkoutSessions(p => p.filter(s => s.id !== id))
   }
@@ -113,5 +186,6 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
     pendingSet, pendingReps, setPendingReps,
     toggleSet, confirmSet, cancelPending,
     addExerciseSet, removeSession,
+    tabataRun, startTabata, stopTabata,
   }
 }

@@ -4,7 +4,7 @@ import { useLocalState } from './useLocalState.js'
 export function useTodos() {
   const [todos, setTodos] = useLocalState('todos', [])
 
-  function addTask({ name, taskType, goalMode, sets, reps, seconds, desc }) {
+  function addTask({ name, taskType, goalMode, sets, reps, seconds, desc, tabata, restSec }) {
     const createdAt = getToday(); createdAt.setHours(12, 0, 0, 0)
     const base = { id: Date.now(), text: name, completed: false, createdAt: createdAt.toISOString(), taskType, ...(desc ? { desc } : {}) }
     if (taskType === 'workout') {
@@ -13,6 +13,10 @@ export function useTodos() {
       if (goalMode === 'reps') base.reps    = parseInt(reps)    || 10
       else                     base.seconds = parseInt(seconds) || 60
       base.completedSets = Array(s).fill(false)
+      if (goalMode === 'time' && tabata) {
+        base.tabata = true
+        base.restSec = Math.max(1, parseInt(restSec) || 20)
+      }
     }
     setTodos(p => [...p, base])
   }

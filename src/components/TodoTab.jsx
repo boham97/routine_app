@@ -15,6 +15,7 @@ export default function TodoTab({
   selectedDate, setSelectedDate,
   labelForDate,
   sessionsForDay, toggleSet, addExerciseSet, exTimer,
+  tabataRun, startTabata, stopTabata,
   groupsForDay, toggleGroupItemCount, removeTodoGroup,
   removeSession,
   confirm, rate,
@@ -166,10 +167,14 @@ export default function TodoTab({
               </div>
               {expanded && session.exercises.map((ex, i) => {
                 const exDone = ex.completedSets.filter(Boolean).length
+                const isTabataRunning = tabataRun && tabataRun.sessionId === session.id && tabataRun.exerciseId === ex.id
                 return (
                   <div key={ex.id} style={{ padding: '12px 14px', borderTop: i === 0 ? 'none' : '0.5px solid #e5e5ea' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: '600' }}>{ex.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '15px', fontWeight: '600' }}>{ex.name}</span>
+                        {ex.tabata && <span style={{ fontSize: '10px', color: '#ff9500', background: '#fff3e0', padding: '1px 5px', borderRadius: '4px', fontWeight: '600' }}>타바타</span>}
+                      </div>
                       <span style={{ fontSize: '12px', color: '#8e8e93' }}>{exDone}/{ex.sets}세트 · {ex.reps}{ex.unit}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -184,19 +189,33 @@ export default function TodoTab({
                           ? (isOvertime ? `+${exTimer.elapsed - exTimer.total}초` : `${exTimer.total - exTimer.elapsed}초`)
                           : (done ? `${val}${ex.unit}` : si + 1)
                         return (
-                          <button key={si} onClick={() => toggleSet(session.id, ex.id, si)} style={{
+                          <button key={si} disabled={isTabataRunning} onClick={() => toggleSet(session.id, ex.id, si)} style={{
                             minWidth: '36px', height: '36px', borderRadius: '8px', padding: '0 6px',
                             border: `1.5px solid ${borderColor}`,
                             background: btnColor, color: (done || isRunning) ? '#fff' : '#8e8e93',
-                            fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                            fontSize: '12px', fontWeight: '600', cursor: isTabataRunning ? 'default' : 'pointer',
+                            opacity: isTabataRunning && !isRunning ? 0.6 : 1,
                           }}>{label}</button>
                         )
                       })}
-                      <button
-                        onClick={() => addExerciseSet(session.id, ex.id)}
-                        aria-label="세트 추가"
-                        style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1.5px solid #c6c6c8', background: 'transparent', color: '#8e8e93', fontSize: '22px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
-                      >+</button>
+                      {ex.tabata ? (
+                        <button
+                          onClick={() => isTabataRunning ? stopTabata() : startTabata(session.id, ex.id)}
+                          disabled={!isTabataRunning && exDone >= ex.sets}
+                          style={{
+                            height: '36px', padding: '0 12px', borderRadius: '8px', border: 'none',
+                            background: isTabataRunning ? '#ff3b30' : (exDone >= ex.sets ? '#e5e5ea' : '#ff9500'),
+                            color: isTabataRunning || exDone < ex.sets ? '#fff' : '#c6c6c8',
+                            fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >{isTabataRunning ? '중지' : '시작'}</button>
+                      ) : (
+                        <button
+                          onClick={() => addExerciseSet(session.id, ex.id)}
+                          aria-label="세트 추가"
+                          style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1.5px solid #c6c6c8', background: 'transparent', color: '#8e8e93', fontSize: '22px', fontWeight: '600', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+                        >+</button>
+                      )}
                     </div>
                   </div>
                 )

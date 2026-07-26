@@ -56,6 +56,7 @@ export default function App() {
               sessionsForDay={sessionsForDay}
               toggleSet={runner.toggleSet} addExerciseSet={runner.addExerciseSet} removeSession={runner.removeSession}
               exTimer={runner.exTimer}
+              tabataRun={runner.tabataRun} startTabata={runner.startTabata} stopTabata={runner.stopTabata}
               groupsForDay={groupsForDay}
               toggleGroupItemCount={todoGroups.toggleGroupItemCount} removeTodoGroup={todoGroups.removeTodoGroup}
               confirm={confirm} rate={rate}

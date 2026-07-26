@@ -48,6 +48,23 @@ function SectionHeader({ children, count, action, top, bottom, innerRef, onClick
   )
 }
 
+function Switch({ checked, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '46px', height: '28px', borderRadius: '14px', cursor: 'pointer', flexShrink: 0,
+        background: checked ? '#34c759' : '#e5e5ea', position: 'relative', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        width: '24px', height: '24px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px',
+        left: checked ? '20px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </div>
+  )
+}
+
 function Stepper({ label, value, onChange, color = '#007aff' }) {
   const valRef = useRef(value); valRef.current = value
   const hold = useHold()
@@ -140,6 +157,7 @@ export default function RoutineTab({
   const [reps,     setReps]     = useState('')
   const [seconds,  setSeconds]  = useState('')
   const [desc,     setDesc]     = useState('')
+  const [restSecInput, setRestSecInput] = useState('20')
 
   const scrollRef = useRef(null)
   const headerRefs = useRef({})
@@ -160,6 +178,8 @@ export default function RoutineTab({
   const [dSets,    setDSets]    = useState(3)
   const [dReps,    setDReps]    = useState(10)
   const [dSeconds, setDSeconds] = useState(60)
+  const [dTabata,  setDTabata]  = useState(false)
+  const [dRestSec, setDRestSec] = useState(20)
 
   // ── 운동 그룹 디테일 패널 ──
   const wgPanel      = useSlidePanel()
@@ -172,14 +192,19 @@ export default function RoutineTab({
 
   function handleAdd() {
     if (!canAdd) return
-    addTask({ name: name.trim(), taskType: type, goalMode, sets, reps, seconds, desc: desc.trim() })
-    setName(''); setDesc(''); setSets(''); setReps(''); setSeconds('')
+    const isTabata = goalMode === 'tabata'
+    addTask({
+      name: name.trim(), taskType: type, goalMode: isTabata ? 'time' : goalMode,
+      sets, reps, seconds, desc: desc.trim(),
+      tabata: isTabata, restSec: restSecInput,
+    })
+    setName(''); setDesc(''); setSets(''); setReps(''); setSeconds(''); setRestSecInput('20')
     addPanel.close()
   }
 
   function startAdd(taskType) {
     setType(taskType)
-    setName(''); setDesc(''); setGoalMode('reps')
+    setName(''); setDesc(''); setGoalMode('reps'); setRestSecInput('20')
     if (taskType === 'workout') { setSets('4'); setReps('10'); setSeconds('60') }
     addPanel.open()
     setTimeout(() => nameInputRef.current?.focus(), 320)
@@ -190,13 +215,16 @@ export default function RoutineTab({
   function openDetail(task) {
     setDDesc(task.desc || ''); setDSets(task.sets || 3)
     setDReps(task.reps || 10); setDSeconds(task.seconds || 60)
+    setDTabata(task.tabata || false); setDRestSec(task.restSec || 20)
     setDetailTask(task); taskPanel.open()
   }
   function closeDetail() { taskPanel.close(() => setDetailTask(null)) }
   function saveDetail() {
     if (!detailTask) return
     if (detailTask.taskType === 'workout') {
-      updateTask(detailTask.id, { sets: dSets, ...(detailTask.goalMode === 'reps' ? { reps: dReps } : { seconds: dSeconds }) })
+      const changes = { sets: dSets, ...(detailTask.goalMode === 'reps' ? { reps: dReps } : { seconds: dSeconds }) }
+      if (detailTask.goalMode === 'time') { changes.tabata = dTabata; changes.restSec = Math.max(1, dRestSec || 20) }
+      updateTask(detailTask.id, changes)
     } else {
       updateTask(detailTask.id, { desc: dDesc.trim() })
     }
@@ -218,6 +246,7 @@ export default function RoutineTab({
       id: t.id, name: t.text, sets: t.sets,
       reps: t.goalMode === 'reps' ? t.reps : t.seconds,
       unit: t.goalMode === 'reps' ? '회' : '초',
+      ...(t.goalMode === 'time' && t.tabata ? { tabata: true, restSec: t.restSec || 20 } : {}),
     }))
     if (wgTarget) {
       updateWorkoutGroup(wgTarget.id, { name: wgdName.trim(), exercises })
@@ -315,7 +344,10 @@ export default function RoutineTab({
                 const isReps = task.goalMode === 'reps'
                 return (
                   <div key={task.id} onClick={() => openDetail(task)} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: '10px', borderTop: i > 0 ? '0.5px solid #f2f2f7' : 'none', cursor: 'pointer' }}>
-                    <span style={{ flex: 1, fontSize: '15px', color: '#000' }}>{task.text}</span>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <span style={{ fontSize: '15px', color: '#000' }}>{task.text}</span>
+                      {task.tabata && <span style={{ fontSize: '10px', color: '#ff9500', background: '#fff3e0', padding: '1px 5px', borderRadius: '4px', fontWeight: '600', flexShrink: 0 }}>타바타</span>}
+                    </div>
                     <span style={{ fontSize: '14px', color: '#8e8e93' }}>{task.sets}세트 · {isReps ? task.reps : task.seconds}{isReps ? '회' : '초'}</span>
                     <span style={{ color: '#c6c6c8', fontSize: '16px', flexShrink: 0 }}>›</span>
                   </div>
@@ -415,8 +447,9 @@ export default function RoutineTab({
                 <div>
                   <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>목표 유형</div>
                   <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '2px', gap: '2px' }}>
-                    <button onClick={() => setGoalMode('reps')} style={SEG(goalMode === 'reps', '#007aff')}>횟수</button>
-                    <button onClick={() => setGoalMode('time')} style={SEG(goalMode === 'time', '#007aff')}>시간</button>
+                    <button onClick={() => { setGoalMode('reps'); setSets('4'); setReps('10') }} style={SEG(goalMode === 'reps', '#007aff')}>횟수</button>
+                    <button onClick={() => { setGoalMode('time'); setSets('4'); setSeconds('60') }} style={SEG(goalMode === 'time', '#007aff')}>시간</button>
+                    <button onClick={() => { setGoalMode('tabata'); setSets('8'); setSeconds('20'); setRestSecInput('10') }} style={SEG(goalMode === 'tabata', '#ff9500')}>타바타</button>
                   </div>
                 </div>
                 <div>
@@ -435,6 +468,16 @@ export default function RoutineTab({
                     </div>
                   </div>
                 </div>
+                {goalMode === 'tabata' && (
+                  <div style={{ borderTop: '0.5px solid #f2f2f7', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', color: '#8e8e93', flex: 1 }}>세트 사이 휴식 시간</span>
+                      <input value={restSecInput} onChange={e => setRestSecInput(e.target.value)} onFocus={e => e.target.select()} type="number" min="1" style={NUM_INPUT} />
+                      <span style={{ fontSize: '13px', color: '#8e8e93' }}>초</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8e8e93' }}>시간이 다 되면 자동으로 체크되고 휴식 후 다음 세트가 시작됩니다</div>
+                  </div>
+                )}
               </div>
             )}
             <button
@@ -474,7 +517,17 @@ export default function RoutineTab({
                     : <Stepper label="초"   value={dSeconds} onChange={setDSeconds} color="#007aff" />}
                 </div>
               </div>
-            ) : (
+            ) : null}
+            {detailTask.taskType === 'workout' && detailTask.goalMode === 'time' && (
+              <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '600', color: '#000' }}>타바타 모드</span>
+                  <Switch checked={dTabata} onChange={setDTabata} />
+                </div>
+                {dTabata && <Stepper label="휴식(초)" value={dRestSec} onChange={setDRestSec} color="#ff9500" />}
+              </div>
+            )}
+            {detailTask.taskType !== 'workout' && (
               <div style={{ background: '#fff', borderRadius: '14px', overflow: 'hidden' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', padding: '12px 16px 4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>설명</div>
                 <textarea value={dDesc} onChange={e => setDDesc(e.target.value)} placeholder="설명을 입력하세요" rows={4}
