@@ -1,9 +1,15 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useBeep } from './useBeep.js'
 
 // 운동 세션 실행 흐름(세트 토글, 실제 횟수 입력, 휴식/운동 타이머, 비프음)을 한곳에 모음.
 // 반환: { exTimer, restSec, pendingSet, pendingReps, setPendingReps,
 //         toggleSet, confirmSet, cancelPending, addExerciseSet, removeSession }
+//
+// 모든 타이머는 tick 횟수가 아니라 실제 시각(deadline) 기준으로 계산한다.
+// iOS Safari는 백그라운드/화면잠금에서 setInterval을 멈추기 때문에,
+// 감소 카운트 방식이면 앱을 다시 열 때까지 타이머가 얼어붙는다.
+const TICK = 250
+
 export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
   const beep = useBeep()
 
@@ -12,6 +18,7 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
 
   const [restSec, setRestSec] = useState(null)
   const restRef = useRef(null)
+  const restEndRef = useRef(0)
 
   // { sessionId, exerciseId, setIdx, elapsed, total }
   const [exTimer, setExTimer] = useState(null)
@@ -21,25 +28,28 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
   const [tabataRun, setTabataRun] = useState(null)
   const tabataStopRef = useRef(false)
 
-  // 운동 타이머가 목표시간 도달하면 알림음 (타바타 자동 진행 중에는 runTabataWork가 직접 처리)
-  useEffect(() => {
-    if (!tabataRun && exTimer && exTimer.elapsed === exTimer.total) beep.play()
-  }, [exTimer]) // eslint-disable-line react-hooks/exhaustive-deps
+  function clearRest() {
+    if (restRef.current) { clearInterval(restRef.current); restRef.current = null }
+    restEndRef.current = 0
+    beep.cancelScheduled()
+  }
 
-  function startRestTimer(sec = 60) {
+  // 휴식 타이머. 종료음은 미리 예약해두므로 백그라운드에서도 제시간에 울린다.
+  function startRestTimer(sec = 60, onDone) {
     beep.init()
-    if (restRef.current) clearInterval(restRef.current)
+    clearRest()
+    restEndRef.current = Date.now() + sec * 1000
     setRestSec(sec)
+    beep.scheduleLong(sec)
     restRef.current = setInterval(() => {
-      setRestSec(prev => {
-        if (prev <= 1) {
-          clearInterval(restRef.current); restRef.current = null
-          beep.playLong()
-          return null
-        }
-        return prev - 1
-      })
-    }, 1000)
+      const left = Math.ceil((restEndRef.current - Date.now()) / 1000)
+      if (left > 0) { setRestSec(left); return }
+      clearInterval(restRef.current); restRef.current = null
+      restEndRef.current = 0
+      setRestSec(null)
+      beep.endScheduled()
+      onDone?.()
+    }, TICK)
   }
 
   function getEx(sessionId, exerciseId) {
@@ -49,8 +59,8 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
 
   function stopTabata() {
     tabataStopRef.current = true
-    if (exRef.current)   { clearInterval(exRef.current);   exRef.current = null }
-    if (restRef.current) { clearInterval(restRef.current); restRef.current = null }
+    if (exRef.current) { clearInterval(exRef.current); exRef.current = null }
+    clearRest()
     setExTimer(null); setRestSec(null); setTabataRun(null)
   }
 
@@ -70,43 +80,28 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
     const ex = getEx(sessionId, exerciseId)
     if (!ex) { setTabataRun(null); return }
     clearInterval(exRef.current)
-    let elapsed = 0
     const total = ex.reps
-    setExTimer({ sessionId, exerciseId, setIdx, elapsed, total })
+    const startAt = Date.now()
+    setExTimer({ sessionId, exerciseId, setIdx, elapsed: 0, total })
     exRef.current = setInterval(() => {
-      elapsed += 1
-      if (elapsed >= total) {
-        clearInterval(exRef.current); exRef.current = null
-        beep.play()
-        setExTimer(null)
-        setExerciseSet(sessionId, exerciseId, setIdx, total)
-        const nextIdx = setIdx + 1
-        if (tabataStopRef.current || nextIdx >= ex.sets) {
-          setTabataRun(null)
-        } else {
-          runTabataRest(sessionId, exerciseId, nextIdx, ex.restSec || 20)
-        }
-      } else {
-        setExTimer({ sessionId, exerciseId, setIdx, elapsed, total })
+      const elapsed = Math.floor((Date.now() - startAt) / 1000)
+      if (elapsed < total) {
+        setExTimer(prev => (!prev || prev.elapsed === elapsed) ? prev : { ...prev, elapsed })
+        return
       }
-    }, 1000)
-  }
-
-  function runTabataRest(sessionId, exerciseId, nextIdx, restDur) {
-    if (tabataStopRef.current) return
-    clearInterval(restRef.current)
-    setRestSec(restDur)
-    restRef.current = setInterval(() => {
-      setRestSec(prev => {
-        if (prev <= 1) {
-          clearInterval(restRef.current); restRef.current = null
-          beep.playLong()
+      clearInterval(exRef.current); exRef.current = null
+      beep.play()
+      setExTimer(null)
+      setExerciseSet(sessionId, exerciseId, setIdx, total)
+      const nextIdx = setIdx + 1
+      if (tabataStopRef.current || nextIdx >= ex.sets) {
+        setTabataRun(null)
+      } else {
+        startRestTimer(ex.restSec || 20, () => {
           if (!tabataStopRef.current) runTabataWork(sessionId, exerciseId, nextIdx)
-          return null
-        }
-        return prev - 1
-      })
-    }, 1000)
+        })
+      }
+    }, TICK)
   }
 
   function setExerciseSet(sessionId, exerciseId, setIdx, mapValue) {
@@ -143,13 +138,16 @@ export function useWorkoutRunner({ workoutSessions, setWorkoutSessions }) {
     if (ex?.unit === '초') {
       beep.init()
       clearInterval(exRef.current)
-      setExTimer({ sessionId, exerciseId, setIdx, elapsed: 0, total: ex.reps })
+      const total = ex.reps
+      const startAt = Date.now()
+      let notified = false
+      setExTimer({ sessionId, exerciseId, setIdx, elapsed: 0, total })
       exRef.current = setInterval(() => {
-        setExTimer(prev => {
-          if (!prev) { clearInterval(exRef.current); return null }
-          return { ...prev, elapsed: prev.elapsed + 1 }
-        })
-      }, 1000)
+        const elapsed = Math.floor((Date.now() - startAt) / 1000)
+        // 목표 도달 알림 (백그라운드에 있다 돌아와 초가 건너뛰어도 한 번은 울린다)
+        if (!notified && elapsed >= total) { notified = true; beep.play() }
+        setExTimer(prev => (!prev || prev.elapsed === elapsed) ? prev : { ...prev, elapsed })
+      }, TICK)
       return
     }
 
