@@ -18,7 +18,9 @@
       "Bash(powershell.exe -Command \"Remove-Item ''C:\\\\Users\\\\bosung\\\\Desktop\\\\routine_app\\\\App.js''\")",
       "mcp__Claude_Preview__preview_start",
       "Bash(npx vercel *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "PowerShell(npm run build)",
+      "Bash(node -e \"setTimeout\\(\\(\\)=>console.log\\('done'\\),40000\\)\")"
     ]
   }
 }

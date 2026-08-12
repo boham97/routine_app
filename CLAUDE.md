@@ -86,6 +86,8 @@ todoTemplates[]      일반 그룹 템플릿. {id, name, color, items:[{id,text,
 todoGroups[]         날짜에 적용된 일반 인스턴스. templateId + date + completedCounts[]
 
 planTasks[]          일회성 태스크 (TodoTab 소유). {id, text, date, completed}
+                     날짜 필터 없이 모든 날짜에서 하나의 접이식 그룹('일회성 태스크')으로 표시
+                     date는 생성일 기록용 (표시 여부에 관여하지 않음)
 foods[]              식자재 (FoodTab 소유). {id, name, expiry, quantity, storage, decimal}
                      quantity 수량(문자열). 등록 시 정수(드럼휠·관성·최소 1, 기본 1개). 사용 시 소수 가능
                      decimal '소수 단위 사용' 체크 여부. 사용/수정 시 decimal이면 0.2 단위, 아니면 1 단위 증감

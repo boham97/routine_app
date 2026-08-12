@@ -26,10 +26,11 @@ export default function TodoTab({
   const [taskInput,  setTaskInput]  = useState('')
   const [expandedSession,   setExpandedSession]   = useState({})
   const [expandedTodoGroup, setExpandedTodoGroup] = useState({})
+  const [oneOffOpen,        setOneOffOpen]        = useState(true)
 
   const selKey = dateKey(selectedDate)
+  // 일회성 태스크는 특정 날짜에 매이지 않고 모든 날짜에서 보인다 (date는 생성일 기록용)
   const [planTasks, setPlanTasks] = useLocalState('planTasks', [])
-  const planTasksForDay = planTasks.filter(t => t.date === selKey)
   const addPlanTask    = text => setPlanTasks(p => [...p, { id: Date.now(), text: text.trim(), date: selKey, completed: false }])
   const removePlanTask = id   => setPlanTasks(p => p.filter(t => t.id !== id))
   const togglePlanTask = id   => setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
@@ -48,7 +49,7 @@ export default function TodoTab({
   const [navEntered, setNavEntered] = useState(false)
   function navigateDate(dir) {
     if (navAnim) return
-    setNavAnim({ dir, sessions: sessionsForDay, groups: groupsForDay, planTasks: planTasksForDay })
+    setNavAnim({ dir, sessions: sessionsForDay, groups: groupsForDay })
     setNavEntered(false)
     setSelectedDate(d => addDays(d, dir))
     requestAnimationFrame(() => requestAnimationFrame(() => setNavEntered(true)))
@@ -119,27 +120,48 @@ export default function TodoTab({
   const sheetTransition = sheetDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
   // ── 하루치 콘텐츠 렌더 (슬라이드 두 레이어에서 공통 사용) ──
-  function renderDay(sessionsList, groupsList, planTasksList) {
-    const empty = (sessionsList?.length ?? 0) === 0 && (groupsList?.length ?? 0) === 0 && (planTasksList?.length ?? 0) === 0
+  function renderDay(sessionsList, groupsList) {
+    const empty = (sessionsList?.length ?? 0) === 0 && (groupsList?.length ?? 0) === 0 && planTasks.length === 0
+    const oneOffTotal = planTasks.length
+    const oneOffDone  = planTasks.filter(t => t.completed).length
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px' }}>
 
-        {/* 일회성 태스크 */}
-        {(planTasksList?.length ?? 0) > 0 && planTasksList.map(task => (
-          <div key={task.id} style={{ background: '#fff', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              onClick={() => togglePlanTask(task.id)}
-              style={{ ...circle, background: task.completed ? '#34c759' : 'transparent', border: task.completed ? 'none' : '2px solid #c6c6c8', cursor: 'pointer', flexShrink: 0 }}
-            >
-              {task.completed && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+        {/* 일회성 태스크 — 날짜와 무관하게 항상 한 그룹으로 표시 */}
+        {oneOffTotal > 0 && (
+          <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '14px', gap: '8px' }}>
+              <div onClick={() => setOneOffOpen(v => !v)} style={{ display: 'flex', flex: 1, alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700' }}>일회성 태스크</span>
+                    <span style={{ fontSize: '10px', color: '#8e8e93', background: '#f2f2f7', padding: '1px 5px', borderRadius: '4px', fontWeight: '600' }}>상시</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: oneOffDone === oneOffTotal ? '#34c759' : '#8e8e93', marginTop: '1px' }}>{oneOffDone}/{oneOffTotal} 완료</div>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: rateColor(oneOffDone, oneOffTotal) }}>{rate(oneOffDone, oneOffTotal)}%</span>
+              </div>
             </div>
-            <span
-              onClick={() => togglePlanTask(task.id)}
-              style={{ flex: 1, fontSize: '15px', color: task.completed ? '#8e8e93' : '#000', textDecoration: task.completed ? 'line-through' : 'none', cursor: 'pointer' }}
-            >{task.text}</span>
-            <button onClick={() => removePlanTask(task.id)} style={{ background: 'none', border: 'none', color: '#c6c6c8', fontSize: '20px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
+            <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
+              <div style={{ height: '3px', background: '#34c759', width: `${oneOffDone / oneOffTotal * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
+            </div>
+            {oneOffOpen && planTasks.map((task, i) => (
+              <div key={task.id} style={{ padding: '12px 14px', borderTop: i === 0 ? 'none' : '0.5px solid #e5e5ea', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  onClick={() => togglePlanTask(task.id)}
+                  style={{ ...circle, background: task.completed ? '#34c759' : 'transparent', border: task.completed ? 'none' : '2px solid #c6c6c8', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  {task.completed && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                <span
+                  onClick={() => togglePlanTask(task.id)}
+                  style={{ flex: 1, fontSize: '15px', color: task.completed ? '#8e8e93' : '#000', textDecoration: task.completed ? 'line-through' : 'none', cursor: 'pointer' }}
+                >{task.text}</span>
+                <button onClick={() => removePlanTask(task.id)} style={{ background: 'none', border: 'none', color: '#c6c6c8', fontSize: '20px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
         {/* 운동 세션 */}
         {sessionsList.map(session => {
@@ -343,12 +365,12 @@ export default function TodoTab({
 
         {/* 일회성 태스크 */}
         <div>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', padding: '8px 2px 6px', letterSpacing: '0.3px' }}>일회성 태스크</div>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: '#8e8e93', padding: '8px 2px 6px', letterSpacing: '0.3px' }}>일회성 태스크 <span style={{ fontWeight: '500', color: '#c6c6c8' }}>· 모든 날짜에 표시</span></div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
               value={taskInput} onChange={e => setTaskInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
-              placeholder="오늘 할 일..."
+              placeholder="할 일 입력..."
               style={{ flex: 1, height: '40px', background: '#fff', border: 'none', borderRadius: '10px', padding: '0 12px', fontSize: '15px', outline: 'none' }}
             />
             <button
@@ -422,7 +444,7 @@ export default function TodoTab({
           willChange: 'transform', pointerEvents: 'none',
           padding: '0 16px 8px',
         }}>
-          {renderDay(navAnim.sessions, navAnim.groups, navAnim.planTasks)}
+          {renderDay(navAnim.sessions, navAnim.groups)}
         </div>
       )}
       <div style={{
@@ -433,7 +455,7 @@ export default function TodoTab({
         transition: navAnim && navEntered ? 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
         willChange: navAnim ? 'transform' : 'auto',
       }}>
-        {renderDay(sessionsForDay, groupsForDay, planTasksForDay)}
+        {renderDay(sessionsForDay, groupsForDay)}
       </div>
     </div>
 
