@@ -33,7 +33,12 @@ export default function TodoTab({
   const [planTasks, setPlanTasks] = useLocalState('planTasks', [])
   const addPlanTask    = text => setPlanTasks(p => [...p, { id: Date.now(), text: text.trim(), date: selKey, completed: false }])
   const removePlanTask = id   => setPlanTasks(p => p.filter(t => t.id !== id))
-  const togglePlanTask = id   => setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
+  // 체크하면 완료 표시를 잠깐 보여준 뒤 목록에서 자동으로 사라진다
+  function completePlanTask(id) {
+    if (planTasks.find(t => t.id === id)?.completed) return
+    setPlanTasks(p => p.map(t => t.id === id ? { ...t, completed: true } : t))
+    setTimeout(() => removePlanTask(id), 450)
+  }
 
   function handleAddTask() {
     if (!taskInput.trim()) return
@@ -123,7 +128,6 @@ export default function TodoTab({
   function renderDay(sessionsList, groupsList) {
     const empty = (sessionsList?.length ?? 0) === 0 && (groupsList?.length ?? 0) === 0 && planTasks.length === 0
     const oneOffTotal = planTasks.length
-    const oneOffDone  = planTasks.filter(t => t.completed).length
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px' }}>
 
@@ -137,24 +141,20 @@ export default function TodoTab({
                     <span style={{ fontSize: '15px', fontWeight: '700' }}>일회성 태스크</span>
                     <span style={{ fontSize: '10px', color: '#8e8e93', background: '#f2f2f7', padding: '1px 5px', borderRadius: '4px', fontWeight: '600' }}>상시</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: oneOffDone === oneOffTotal ? '#34c759' : '#8e8e93', marginTop: '1px' }}>{oneOffDone}/{oneOffTotal} 완료</div>
+                  <div style={{ fontSize: '11px', color: '#8e8e93', marginTop: '1px' }}>{oneOffTotal}개 남음</div>
                 </div>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: rateColor(oneOffDone, oneOffTotal) }}>{rate(oneOffDone, oneOffTotal)}%</span>
               </div>
             </div>
-            <div style={{ height: '3px', background: '#e5e5ea', margin: '0 14px 4px', borderRadius: '2px' }}>
-              <div style={{ height: '3px', background: '#34c759', width: `${oneOffDone / oneOffTotal * 100}%`, borderRadius: '2px', transition: 'width 0.3s' }}/>
-            </div>
             {oneOffOpen && planTasks.map((task, i) => (
-              <div key={task.id} style={{ padding: '12px 14px', borderTop: i === 0 ? 'none' : '0.5px solid #e5e5ea', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div key={task.id} style={{ padding: '12px 14px', borderTop: i === 0 ? 'none' : '0.5px solid #e5e5ea', display: 'flex', alignItems: 'center', gap: '12px', opacity: task.completed ? 0 : 1, transition: 'opacity 0.4s' }}>
                 <div
-                  onClick={() => togglePlanTask(task.id)}
+                  onClick={() => completePlanTask(task.id)}
                   style={{ ...circle, background: task.completed ? '#34c759' : 'transparent', border: task.completed ? 'none' : '2px solid #c6c6c8', cursor: 'pointer', flexShrink: 0 }}
                 >
                   {task.completed && <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 </div>
                 <span
-                  onClick={() => togglePlanTask(task.id)}
+                  onClick={() => completePlanTask(task.id)}
                   style={{ flex: 1, fontSize: '15px', color: task.completed ? '#8e8e93' : '#000', textDecoration: task.completed ? 'line-through' : 'none', cursor: 'pointer' }}
                 >{task.text}</span>
                 <button onClick={() => removePlanTask(task.id)} style={{ background: 'none', border: 'none', color: '#c6c6c8', fontSize: '20px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
