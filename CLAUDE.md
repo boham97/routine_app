@@ -167,3 +167,87 @@ load()    // localStorage JSON 파싱 + fallback (useLocalState가 내부적으�
 ### 배포
 
 Vercel 프로젝트 링크됨 (`.vercel/project.json` — `prj_VxxiE5603pHZMSwQvO576Bhkkhay`, alias `routineapp-two.vercel.app`). `npx vercel --prod --yes`로 배포.
+
+### 기기 간 동기화 (계획 — 미구현)
+
+**목적**: 회사 PC ↔ 폰(PWA) 사이에서 데이터가 자동으로 같아지게 하기. 수동 JSON 내보내기/가져오기는 깜빡하면 한쪽이 날아가므로 채택하지 않음.
+
+**선택한 방식**: Vercel 서버리스 함수 1개 + 키-값 저장소에 **전체 상태를 JSON 한 덩어리**로 저장.
+데이터가 작은 배열 7개뿐이라 테이블로 정규화할 이유가 없고, 로그인 UI 없이 '동기화 키' 하나로 기기를 묶을 수 있어 코드 추가량이 가장 적음 (서버 ~60줄 + 클라이언트 ~80줄).
+
+#### 동기화 대상 (localStorage 키 7개, 전부 `useLocalState`)
+
+| 키 | 소유 |
+|---|---|
+| `todos` | `useTodos` |
+| `workoutTemplates`, `workoutSessions` | `useWorkoutData` |
+| `todoTemplates`, `todoGroups` | `useTodoGroupData` |
+| `planTasks` | `TodoTab` |
+| `foods` | `FoodTab` |
+
+신규 영속 상태를 추가하면 **이 목록과 `SYNC_KEYS` 상수에 반드시 같이 추가**할 것.
+
+#### 페이로드 스키마
+
+```jsonc
+{
+  "version": 1,          // 스키마 버전. 향후 마이그레이션 분기용
+  "rev": 7,              // 서버가 write마다 +1. 충돌 감지용
+  "updatedAt": "2026-11-18T09:00:00.000Z",
+  "data": {
+    "todos": [], "workoutTemplates": [], "workoutSessions": [],
+    "todoTemplates": [], "todoGroups": [], "planTasks": [], "foods": []
+  }
+}
+```
+
+누락된 키는 `useLocalState`의 fallback(`[]`)으로 채움 — 구버전 payload도 받아들일 수 있어야 함.
+
+#### 서버: `api/sync.js` (신규)
+
+Vercel은 레포 루트의 `api/` 디렉터리를 서버리스 함수로 자동 인식 (Vite 빌드와 별개, 설정 불필요).
+
+- `GET /api/sync?key=<syncKey>` → 저장된 payload 또는 `{ rev: 0, data: null }`
+- `POST /api/sync?key=<syncKey>` body `{ baseRev, data }`
+  - 저장소의 현재 `rev`가 `baseRev`와 다르면 **409 + 서버 payload 반환** (충돌)
+  - 같으면 `rev+1`로 저장 후 새 payload 반환
+- 저장소 키 네임스페이스: `routine:<syncKey>`
+- `syncKey` 검증: 32자 hex만 허용 (`/^[0-9a-f]{32}$/`). 임의 문자열로 저장소를 오염시키지 못하게.
+
+**저장소**: Upstash Redis(Vercel 마켓플레이스 통합) 또는 Vercel Blob.
+→ 구현 시점에 Vercel 대시보드에서 현재 제공되는 무료 티어 상품명을 먼저 확인할 것 (KV 상품 구성이 바뀌었을 수 있음).
+자격증명은 **서버 환경변수로만** 두고 클라이언트에 노출 금지 (`vercel env add`).
+
+#### 클라이언트
+
+- `src/utils/backup.js` (신규) — `SYNC_KEYS` 상수, `collectLocal()` / `writeLocal(data)` 직렬화·역직렬화. 순수 함수만.
+- `src/hooks/useSync.js` (신규) — App.jsx에서 **한 번만** 호출. 도메인 훅(`useTodos` 등)에 동기화 로직을 넣지 말 것.
+  - `syncKey`, `rev`는 `useLocalState('syncKey', '')` / `useLocalState('syncRev', 0)`로 영속화
+  - **pull**: 앱 마운트 시 + `visibilitychange`로 포그라운드 복귀 시 (폰 PWA는 종료가 아니라 백그라운드로 가므로 마운트 훅만으로는 부족)
+  - **push**: `SYNC_KEYS`에 해당하는 `storage` 변화를 감지해 **2초 디바운스** 후 전송
+  - **오프라인**: 실패하면 조용히 넘기고 다음 pull/push 때 재시도. 별도 큐 불필요
+- **pull 적용은 localStorage 일괄 write 후 `location.reload()`**.
+  훅 7개가 이미 마운트된 상태라 setState를 분산 호출하면 일부만 반영되거나 그 setState가 다시 push를 유발하는 루프가 생김. 리로드가 가장 안전.
+- 상태 표시: 화면 상단에 작은 인디케이터(동기화 중 / 완료 / 오프라인). 휴식 타이머 배너와 자리가 겹치지 않게 주의.
+
+#### 충돌 처리
+
+전체 덩어리 교체이므로 **양쪽에서 같은 시간대에 수정하면 한쪽이 사라짐**. `rev` 기반 409로 이를 감지해서 사용자에게 선택을 넘김:
+
+- 409를 받으면 push를 중단하고 `useConfirm`으로 모달 — "서버 쪽 / 이 기기 쪽" 중 선택
+- 서버 쪽 선택 → pull 후 리로드 / 이 기기 쪽 선택 → 서버 `rev`를 `baseRev`로 재전송(강제 덮어쓰기)
+- 조용한 자동 병합은 하지 말 것. 어느 쪽이 맞는지 코드가 판단할 수 없음
+
+#### 기기 연결 절차
+
+1. 회사 PC에서 동기화 키 생성 (`crypto.randomUUID().replace(/-/g,'')`) → 화면에 표시
+2. 폰에서 그 키를 입력 (복사 붙여넣기, 추후 QR 고려)
+3. 키가 곧 인증 수단이므로 **노출되면 데이터가 읽힌다**는 점을 UI에 명시
+
+#### 구현 순서
+
+1. `src/utils/backup.js` — `SYNC_KEYS` + 직렬화. 여기까지만으로 수동 내보내기/가져오기도 가능
+2. `api/sync.js` + 저장소 연결 + `vercel env`
+3. `src/hooks/useSync.js` — pull만 (수동 버튼으로 먼저 검증)
+4. 자동 push(디바운스) + 충돌 모달
+5. 동기화 설정 UI — 기존 `useSlidePanel` 패턴을 따르는 패널
