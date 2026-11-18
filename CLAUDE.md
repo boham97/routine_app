@@ -173,7 +173,7 @@ Vercel 프로젝트 링크됨 (`.vercel/project.json` — `prj_VxxiE5603pHZMSwQv
 **목적**: 회사 PC ↔ 폰(PWA) 사이에서 데이터가 자동으로 같아지게 하기. 수동 JSON 내보내기/가져오기는 깜빡하면 한쪽이 날아가므로 채택하지 않음.
 
 **선택한 방식**: Vercel 서버리스 함수 1개 + 키-값 저장소에 **전체 상태를 JSON 한 덩어리**로 저장.
-데이터가 작은 배열 7개뿐이라 테이블로 정규화할 이유가 없고, 로그인 UI 없이 '동기화 키' 하나로 기기를 묶을 수 있어 코드 추가량이 가장 적음 (서버 ~60줄 + 클라이언트 ~80줄).
+데이터가 작은 배열 7개뿐이라 테이블로 정규화할 이유가 없고, 로그인 UI 없이 '동기화 키' 하나로 기기를 묶을 수 있어 코드 추가량이 가장 적음 (서버 ~60줄 + 클라이언트 ~130줄, 암호화 포함).
 
 #### 동기화 대상 (localStorage 키 7개, 전부 `useLocalState`)
 
@@ -194,10 +194,17 @@ Vercel 프로젝트 링크됨 (`.vercel/project.json` — `prj_VxxiE5603pHZMSwQv
   "version": 1,          // 스키마 버전. 향후 마이그레이션 분기용
   "rev": 7,              // 서버가 write마다 +1. 충돌 감지용
   "updatedAt": "2026-11-18T09:00:00.000Z",
-  "data": {
-    "todos": [], "workoutTemplates": [], "workoutSessions": [],
-    "todoTemplates": [], "todoGroups": [], "planTasks": [], "foods": []
-  }
+  "enc": { "iv": "<base64 12B>", "ct": "<base64 AES-GCM 암호문>" }
+}
+```
+
+서버에 저장·전송되는 형태. `version`/`rev`/`updatedAt`만 평문이고 실제 데이터는 `enc` 안에 암호문으로만 존재.
+복호화하면 아래 평문 `data`가 나옴 (클라이언트 메모리에서만):
+
+```jsonc
+{
+  "todos": [], "workoutTemplates": [], "workoutSessions": [],
+  "todoTemplates": [], "todoGroups": [], "planTasks": [], "foods": []
 }
 ```
 
@@ -207,12 +214,18 @@ Vercel 프로젝트 링크됨 (`.vercel/project.json` — `prj_VxxiE5603pHZMSwQv
 
 Vercel은 레포 루트의 `api/` 디렉터리를 서버리스 함수로 자동 인식 (Vite 빌드와 별개, 설정 불필요).
 
-- `GET /api/sync?key=<syncKey>` → 저장된 payload 또는 `{ rev: 0, data: null }`
-- `POST /api/sync?key=<syncKey>` body `{ baseRev, data }`
+인증은 **`Authorization: Bearer <authId>` 헤더**로만 받음. 쿼리스트링(`?key=`) 금지 — URL은 Vercel 요청 로그·브라우저 기록·회사 프록시 로그에 남음.
+서버는 원본 동기화 키를 **절대 받지 않음** (아래 '보안' 참고). 받는 건 키에서 파생된 `authId`뿐.
+
+- `GET /api/sync` → 저장된 payload 또는 `{ rev: 0, enc: null }`
+- `POST /api/sync` body `{ baseRev, enc }`
   - 저장소의 현재 `rev`가 `baseRev`와 다르면 **409 + 서버 payload 반환** (충돌)
   - 같으면 `rev+1`로 저장 후 새 payload 반환
-- 저장소 키 네임스페이스: `routine:<syncKey>`
-- `syncKey` 검증: 32자 hex만 허용 (`/^[0-9a-f]{32}$/`). 임의 문자열로 저장소를 오염시키지 못하게.
+- `DELETE /api/sync` → 해당 항목 삭제 (키 재발급 시 구 키 폐기용)
+- 저장소 키: `routine:<sha256(authId)>` — 저장소 덤프나 대시보드를 봐도 유효한 `authId`를 알 수 없게 한 번 더 해시
+- `authId` 검증: 64자 hex만 허용 (`/^[0-9a-f]{64}$/`). 임의 문자열로 저장소를 오염시키지 못하게.
+- 요청 바디 크기 제한 (예: 1MB 초과 시 413). 키 없이도 아무나 호출 가능한 엔드포인트이므로.
+- `enc`는 서버가 해석하지 않고 그대로 저장. 서버 로직은 `rev` 비교만.
 
 **저장소**: Upstash Redis(Vercel 마켓플레이스 통합) 또는 Vercel Blob.
 → 구현 시점에 Vercel 대시보드에서 현재 제공되는 무료 티어 상품명을 먼저 확인할 것 (KV 상품 구성이 바뀌었을 수 있음).
@@ -221,6 +234,10 @@ Vercel은 레포 루트의 `api/` 디렉터리를 서버리스 함수로 자동 
 #### 클라이언트
 
 - `src/utils/backup.js` (신규) — `SYNC_KEYS` 상수, `collectLocal()` / `writeLocal(data)` 직렬화·역직렬화. 순수 함수만.
+- `src/utils/crypto.js` (신규) — Web Crypto(`crypto.subtle`)만 사용, 외부 라이브러리 없음.
+  - `deriveKeys(syncKey)` → `{ authId, encKey }` (HKDF-SHA256, info 문자열로 분리)
+  - `encrypt(encKey, data)` → `{ iv, ct }` / `decrypt(encKey, enc)` → `data`
+  - 복호화 실패(GCM 태그 불일치) 시 예외 → 키가 틀렸거나 데이터 손상. 로컬 데이터를 건드리지 말고 오류 표시.
 - `src/hooks/useSync.js` (신규) — App.jsx에서 **한 번만** 호출. 도메인 훅(`useTodos` 등)에 동기화 로직을 넣지 말 것.
   - `syncKey`, `rev`는 `useLocalState('syncKey', '')` / `useLocalState('syncRev', 0)`로 영속화
   - **pull**: 앱 마운트 시 + `visibilitychange`로 포그라운드 복귀 시 (폰 PWA는 종료가 아니라 백그라운드로 가므로 마운트 훅만으로는 부족)
@@ -229,6 +246,25 @@ Vercel은 레포 루트의 `api/` 디렉터리를 서버리스 함수로 자동 
 - **pull 적용은 localStorage 일괄 write 후 `location.reload()`**.
   훅 7개가 이미 마운트된 상태라 setState를 분산 호출하면 일부만 반영되거나 그 setState가 다시 push를 유발하는 루프가 생김. 리로드가 가장 안전.
 - 상태 표시: 화면 상단에 작은 인디케이터(동기화 중 / 완료 / 오프라인). 휴식 타이머 배너와 자리가 겹치지 않게 주의.
+
+#### 보안
+
+**전제: 동기화 키 = 비밀번호.** 키를 아는 사람은 데이터를 읽고 덮어쓸 수 있음. 아래 조치는 '키 자체 말고는 새는 경로가 없게' 하는 것이 목적이며, 키가 유출되면 재발급 외 대응 수단은 없음.
+
+- **키 생성**: `crypto.getRandomValues(new Uint8Array(16))` → 32자 hex (128비트). 무작위 추측은 사실상 불가능.
+- **키 파생 (HKDF-SHA256)**: 하나의 동기화 키에서 용도별로 분리
+  - `authId` (info `"routine-sync/auth"`, 32B → 64자 hex) — 서버 인증·조회용. 서버에 전송됨
+  - `encKey` (info `"routine-sync/enc"`, AES-GCM 256) — 암호화용. **기기 밖으로 나가지 않음**
+  - `authId`로는 `encKey`를 역산할 수 없으므로 **서버·저장소 운영자·Vercel 로그 모두 데이터 내용을 볼 수 없음**
+- **클라이언트 측 암호화 (AES-GCM)**: push 직전 `data` 전체를 암호화, pull 직후 복호화. `iv`는 매 암호화마다 새로 생성(재사용 금지).
+- **전송**: `Authorization` 헤더만. 쿼리스트링·로그·`console.log`에 키/`authId` 출력 금지.
+- **저장**: localStorage에는 원본 `syncKey`만 저장(`useLocalState('syncKey', '')`). 파생 키는 메모리에서 매번 계산.
+- **키 재발급 (설정 UI 버튼)**:
+  1. 새 키 생성 → 현재 로컬 데이터를 새 키로 암호화해 `baseRev: 0`으로 POST
+  2. 성공하면 구 키로 `DELETE` → 로컬 `syncKey`/`syncRev` 교체
+  3. 다른 기기는 새 키를 다시 입력해야 함 (UI에 안내)
+- **구 키 기기 보호**: pull 결과가 `rev: 0, enc: null`인데 로컬 `syncRev > 0`이면 → **키가 폐기됐거나 서버 데이터가 사라진 것**. 자동 push 하지 말고(구 키로 데이터를 되살려버림) 동기화 일시정지 + "키를 다시 확인하세요" 표시.
+- **UI 문구**: 키 표시 화면에 "이 키를 아는 사람은 모든 데이터를 볼 수 있습니다. 메신저·스크린샷 공유 주의. 유출이 의심되면 재발급하세요." 명시.
 
 #### 충돌 처리
 
@@ -240,14 +276,16 @@ Vercel은 레포 루트의 `api/` 디렉터리를 서버리스 함수로 자동 
 
 #### 기기 연결 절차
 
-1. 회사 PC에서 동기화 키 생성 (`crypto.randomUUID().replace(/-/g,'')`) → 화면에 표시
+1. 회사 PC에서 동기화 키 생성 (`crypto.getRandomValues` 16바이트 → hex) → 화면에 표시 (기본은 가림, 탭하면 표시)
 2. 폰에서 그 키를 입력 (복사 붙여넣기, 추후 QR 고려)
-3. 키가 곧 인증 수단이므로 **노출되면 데이터가 읽힌다**는 점을 UI에 명시
+3. 입력 직후 pull 해서 복호화 성공 여부로 키 검증 → 실패하면 저장하지 않음
+4. 키가 곧 인증 수단이므로 **노출되면 데이터가 읽힌다**는 점을 UI에 명시 (위 '보안' 문구)
 
 #### 구현 순서
 
 1. `src/utils/backup.js` — `SYNC_KEYS` + 직렬화. 여기까지만으로 수동 내보내기/가져오기도 가능
-2. `api/sync.js` + 저장소 연결 + `vercel env`
-3. `src/hooks/useSync.js` — pull만 (수동 버튼으로 먼저 검증)
-4. 자동 push(디바운스) + 충돌 모달
-5. 동기화 설정 UI — 기존 `useSlidePanel` 패턴을 따르는 패널
+2. `src/utils/crypto.js` — `deriveKeys`/`encrypt`/`decrypt`. 브라우저 콘솔에서 왕복(암호화→복호화) 먼저 확인
+3. `api/sync.js` + 저장소 연결 + `vercel env` (헤더 인증, `sha256(authId)` 저장 키, 크기 제한, DELETE)
+4. `src/hooks/useSync.js` — pull만 (수동 버튼으로 먼저 검증)
+5. 자동 push(디바운스) + 충돌 모달 + 구 키 기기 보호
+6. 동기화 설정 UI — 기존 `useSlidePanel` 패턴을 따르는 패널. 키 생성/입력/가림 표시/재발급
